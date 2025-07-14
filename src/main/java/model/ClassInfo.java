@@ -55,6 +55,10 @@ public class ClassInfo {
     public ClassType getClassType() {
         return classType;
     }
+    
+    public void setClassType(ClassType classType) {
+        this.classType = classType;
+    }
 
     public ArrayList<Attribute> getAttributes() {
         return attributes;

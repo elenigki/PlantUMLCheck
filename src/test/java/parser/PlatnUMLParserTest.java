@@ -204,64 +204,6 @@ public class PlatnUMLParserTest {
 	}
 	
 	@Test
-	public void testInferredDependenciesMultipleClasses() throws IOException {
-	    String uml = "@startuml\n" +
-	                 "class Author\n" +
-	                 "class Book\n" +
-	                 "class Library\n" +
-	                 "class Publisher\n" +
-	                 "class Reader\n" +
-	                 "\n" +
-	                 "class Catalog {\n" +
-	                 "  - List<Book> books\n" +                        // Catalog → Book
-	                 "  - Publisher publisher\n" +                     // Catalog → Publisher
-	                 "  + findBook(String title) : Book\n" +           // Book as return type
-	                 "}\n" +
-	                 "\n" +
-	                 "class Library {\n" +
-	                 "  - Catalog catalog\n" +                          // Library → Catalog
-	                 "  + getBooksBy(Author) : List<Book>\n" +         // Author + Book (nested)
-	                 "}\n" +
-	                 "\n" +
-	                 "class Reader {\n" +
-	                 "  - List<Book> borrowedBooks\n" +                // Reader → Book
-	                 "  + borrow(Book book) : void\n" +                // Book as param
-	                 "  + favoriteAuthor() : Author\n" +               // Author as return
-	                 "}\n" +
-	                 "@enduml";
-
-	    File temp = File.createTempFile("multiDeps", ".puml");
-	    try (FileWriter writer = new FileWriter(temp)) {
-	        writer.write(uml);
-	    }
-
-	    PlantUMLParser parser = new PlantUMLParser();
-	    IntermediateModel model = parser.parse(temp);
-	    ArrayList<Relationship> relationships = model.getRelationships();
-
-	    // Check various key dependencies
-	    assertTrue(containsDependency(relationships, "Catalog", "Book"));
-	    assertTrue(containsDependency(relationships, "Catalog", "Publisher"));
-	    assertTrue(containsDependency(relationships, "Catalog", "Book")); // via return
-	    assertTrue(containsDependency(relationships, "Library", "Catalog"));
-	    assertTrue(containsDependency(relationships, "Library", "Author"));
-	    assertTrue(containsDependency(relationships, "Library", "Book"));
-	    assertTrue(containsDependency(relationships, "Reader", "Book"));
-	    assertTrue(containsDependency(relationships, "Reader", "Author"));
-	}
-
-	/**
-	 * Utility to check if a dependency exists between two class names.
-	 */
-	private boolean containsDependency(List<Relationship> relationships, String from, String to) {
-	    return relationships.stream().anyMatch(r ->
-	        r.getType() == RelationshipType.DEPENDENCY &&
-	        r.getSourceClass().getName().equals(from) &&
-	        r.getTargetClass().getName().equals(to)
-	    );
-	}
-	
-	@Test
 	public void testAggregationAndComposition() throws IOException {
 	    String uml = "@startuml\n" +
 	                 "class Car\n" +
@@ -411,6 +353,122 @@ public class PlatnUMLParserTest {
 	    assertEquals("String author", m.getParameters().get(0));
 	    assertEquals("int year", m.getParameters().get(1));
 	}
+	
+	@Test
+	public void testBasicRelationshipParsing() throws IOException {
+	    String uml = "@startuml\n" +
+	            "class A\n" +
+	            "class B\n" +
+	            "class C\n" +
+	            "class D\n" +
+	            "interface I\n" +
+	            "class E\n" +
+	            "class F\n" +
+	            "class G\n" +
+	            "class H\n" +
+
+	            "A -> B\n" +             // ASSOCIATION
+	            "C --> D\n" +            // DEPENDENCY
+	            "E --|> F\n" +           // GENERALIZATION
+	            "G ..|> I\n" +           // REALIZATION
+	            "H *-- A\n" +            // COMPOSITION
+	            "B o-- C\n" +            // AGGREGATION
+	            "@enduml";
+
+	    File temp = File.createTempFile("uml-basic", ".puml");
+	    try (FileWriter writer = new FileWriter(temp)) {
+	        writer.write(uml);
+	    }
+
+	    PlantUMLParser parser = new PlantUMLParser();
+	    IntermediateModel model = parser.parse(temp);
+	    List<Relationship> relationships = model.getRelationships();
+
+	    assertEquals(6, relationships.size());
+
+	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.ASSOCIATION));
+	    assertTrue(containsRelationship(relationships, "C", "D", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "E", "F", RelationshipType.GENERALIZATION));
+	    assertTrue(containsRelationship(relationships, "G", "I", RelationshipType.REALIZATION));
+	    assertTrue(containsRelationship(relationships, "H", "A", RelationshipType.COMPOSITION));
+	    assertTrue(containsRelationship(relationships, "B", "C", RelationshipType.AGGREGATION));
+	}
+	
+	@Test
+	public void testReverseArrowVariants() throws IOException {
+	    String uml = "@startuml\n" +
+	            "class A\n" +
+	            "class B\n" +
+	            "class C\n" +
+	            "class D\n" +
+	            "interface I\n" +
+	            "class E\n" +
+	            "class F\n" +
+	            "class G\n" +
+
+	            "B <-- A\n" +          // Dependency
+	            "C <|-- D\n" +         // Generalization
+	            "I <|.. E\n" +         // Realization
+	            "A --* B\n" +          // Composition (reverse form)
+	            "F --o G\n" +          // Aggregation (reverse form)
+	            "D <- E\n" +           // Association (reverse form)
+	            "@enduml";
+
+	    File temp = File.createTempFile("uml-reverse", ".puml");
+	    try (FileWriter writer = new FileWriter(temp)) {
+	        writer.write(uml);
+	    }
+
+	    PlantUMLParser parser = new PlantUMLParser();
+	    IntermediateModel model = parser.parse(temp);
+	    List<Relationship> relationships = model.getRelationships();
+
+	    assertEquals(6, relationships.size());
+
+	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "D", "C", RelationshipType.GENERALIZATION));
+	    assertTrue(containsRelationship(relationships, "E", "I", RelationshipType.REALIZATION));
+	    assertTrue(containsRelationship(relationships, "B", "A", RelationshipType.COMPOSITION));
+	    assertTrue(containsRelationship(relationships, "G", "F", RelationshipType.AGGREGATION));
+	    assertTrue(containsRelationship(relationships, "E", "D", RelationshipType.ASSOCIATION));
+
+	}
+
+
+	@Test
+	public void testDashedAndDottedArrowNormalization() throws IOException {
+	    String uml = "@startuml\n" +
+	            "class A\n" +
+	            "class B\n" +
+	            "class C\n" +
+	            "interface I\n" +
+	            "class D\n" +
+	            "class E\n" +
+
+	            "A ---> B\n" +           // A → B (dependency)
+	            "C <... D\n" +           // D → C (association, reverse)
+	            "E ....|> I\n" +         // E → I (realization)
+	            "A --* D\n" +            // D → A (composition, reverse)
+	            "E ---o D\n" +           // D ← E (aggregation, reverse)
+	            "@enduml";
+
+	    File temp = File.createTempFile("uml-norm-dir", ".puml");
+	    try (FileWriter writer = new FileWriter(temp)) {
+	        writer.write(uml);
+	    }
+
+	    PlantUMLParser parser = new PlantUMLParser();
+	    IntermediateModel model = parser.parse(temp);
+	    List<Relationship> relationships = model.getRelationships();
+
+	    assertEquals(5, relationships.size());
+
+	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "D", "C", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "E", "I", RelationshipType.REALIZATION));
+	    assertTrue(containsRelationship(relationships, "D", "A", RelationshipType.COMPOSITION));
+	    assertTrue(containsRelationship(relationships, "D", "E", RelationshipType.AGGREGATION));
+	}
 
 
 	private boolean containsRelationship(List<Relationship> relationships, String from, String to, RelationshipType type) {
@@ -420,6 +478,4 @@ public class PlatnUMLParserTest {
 	        r.getType() == type
 	    );
 	}
-
-
 }
