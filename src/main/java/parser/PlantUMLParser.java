@@ -86,7 +86,7 @@ public class PlantUMLParser {
 
 	// Parses all logical UML lines into model elements using modular handlers
 	private IntermediateModel parseLines(List<String> lines) {
-		IntermediateModel model = new IntermediateModel();
+		IntermediateModel model = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
 		ClassInfo currentClass = null;
 
 		for (String line : lines) {

@@ -32,7 +32,7 @@ public class JavaSourceParser {
     
     // Parses multiple selected Java files and returns a complete model
     public IntermediateModel parse(List<ScannedJavaInfo> selectedClasses) throws IOException {
-        IntermediateModel model = new IntermediateModel();
+        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
         for (ScannedJavaInfo info : selectedClasses) {
             File file = info.getSourceFile();
     	    List<String> rawLines = readLines(file);
@@ -103,7 +103,7 @@ public class JavaSourceParser {
 
     // Parses a single class/interface/enum
     private IntermediateModel parseSingleClass(List<String> lines) {
-        IntermediateModel model = new IntermediateModel();
+        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
 
         // Extract class/interface/enum declaration
         ClassInfo classInfo = extractClassHeader(lines);
