@@ -234,6 +234,25 @@ public class JavaSourceParserTest {
 		assertTrue(warnings.stream().anyMatch(w -> w.contains("Page")));
 		assertTrue(warnings.stream().anyMatch(w -> w.contains("Chapter")));
 	}
+	
+	@Test
+	public void testSetterAggregationDetection() throws Exception {
+	    JavaSourceParser parser = new JavaSourceParser();
+	    List<File> files = loadSampleFiles("setter");
+	    IntermediateModel model = parser.parse(files);
+	    
+		for (Relationship r : model.getRelationships()) {
+			System.out.printf("[%s] %s -> %s\n", r.getType(), r.getSourceClass().getName(),
+					r.getTargetClass().getName());
+		}
+
+	    assertNotNull(model.findClassByName("SetterAggregationExample"));
+
+	    assertRelationshipExists(model, "SetterAggregationExample", "Chapter", RelationshipType.AGGREGATION);
+	    assertNull(getRelationship(model, "SetterAggregationExample", "Book", RelationshipType.AGGREGATION));
+
+	}
+
 
 	// Helper to find a specific relationship between two classes
 	private Relationship getRelationship(IntermediateModel model, String source, String target, RelationshipType type) {

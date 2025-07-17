@@ -527,40 +527,41 @@ public class JavaSourceParser {
 		}
 	}
 
-	// Detects 'this.x = x;' assignments and adds AGGREGATION if x is a method
-	// parameter
-	// Only in constructors or setters
+	// Detects 'this.x = x;' and adds AGGREGATION if x is method parameter
+	// Applies in constructors and setters
 	private void extractAggregationAssignments(String methodBody, ClassInfo currentClass, String methodName,
-			Map<String, String> paramNamesAndTypes) {
-		boolean isConstructor = methodName.equals(currentClass.getName());
-		boolean isSetter = methodName.startsWith("set");
+	                                           Map<String, String> paramNamesAndTypes) {
+	    boolean isConstructor = methodName.equals(currentClass.getName());
+	    boolean isSetter = methodName.startsWith("set") && paramNamesAndTypes.size() == 1;
 
-		if (!(isConstructor || isSetter)) {
-			return;
-		}
+	    if (!(isConstructor || isSetter)) {
+	        return;
+	    }
 
-		for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
-			String paramName = param.getKey();
-			String paramType = param.getValue();
+	    for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
+	        String paramName = param.getKey();
+	        String paramType = param.getValue();
 
-			String patternString = "this\\." + Pattern.quote(paramName) + "\\s*=\\s*" + Pattern.quote(paramName)
-					+ "\\s*;";
-			Pattern pattern = Pattern.compile(patternString);
-			Matcher matcher = pattern.matcher(methodBody);
+	        // Accept both: this.chapter = chapter;
+	        // OR: this.mainChapter = chapter;
+	        String patternString = "this\\.[a-zA-Z0-9_]+\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;";
+	        Pattern pattern = Pattern.compile(patternString);
+	        Matcher matcher = pattern.matcher(methodBody);
 
-			if (matcher.find() && !isJavaBuiltInType(paramType)) {
-				ClassInfo target = model.findClassByName(paramType);
-				if (target == null) {
-					target = new ClassInfo(paramType, ClassType.CLASS);
-					model.addClass(target);
-					model.addWarning("Class '" + paramType + "' not found in source files. Added as dummy.");
-				}
+	        if (matcher.find() && !isJavaBuiltInType(paramType)) {
+	            ClassInfo target = model.findClassByName(paramType);
+	            if (target == null) {
+	                target = new ClassInfo(paramType, ClassType.CLASS);
+	                model.addClass(target);
+	                model.addWarning("Class '" + paramType + "' not found in source files. Added as dummy.");
+	            }
 
-				Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
-				model.addRelationship(rel);
-			}
-		}
+	            Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
+	            model.addRelationship(rel);
+	        }
+	    }
 	}
+
 
 	// Checks if an attribute includes `= new ...` → composition if it's main type or a collection
 	private boolean isComposedAttribute(String line, String declaredType) {
