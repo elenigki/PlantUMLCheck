@@ -1,6 +1,8 @@
 package model;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ClassInfo {
 	private String name;
@@ -67,5 +69,19 @@ public class ClassInfo {
     public ArrayList<Method> getMethods() {
         return methods;
     }
+    
+    // store extra data related to this class
+    private Map<String, Object> metadata = new HashMap<>();
+
+    // set arbitrary metadata by key
+    public void setMetadata(String key, Object value) {
+        metadata.put(key, value);
+    }
+
+    // get stored metadata by key
+    public Object getMetadata(String key) {
+        return metadata.get(key);
+    }
+
 
 }

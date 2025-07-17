@@ -1,12 +1,14 @@
 package model;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class IntermediateModel {
 	
 	private ArrayList<ClassInfo> classes; // All parsed classes/interfaces/etc.
 	private ArrayList<Relationship> relationships; // All relationships between the classes
 	private ModelSource modelSource;
+    private List<String> warnings = new ArrayList<>();
 
 	public IntermediateModel(ModelSource modelSource) {
         this.classes = new ArrayList<>();
@@ -43,4 +45,20 @@ public class IntermediateModel {
         }
         return null;
     }
+    
+    public void addWarning(String message) {
+        warnings.add(message);
+    }
+    
+    public void removeWarningsForClass(String className) {
+        String pattern = "Class '" + className + "' not found in source files. Added as dummy.";
+        warnings.removeIf(w -> w.equals(pattern));
+    }
+
+
+
+    public List<String> getWarnings() {
+        return warnings;
+    }
+
 }

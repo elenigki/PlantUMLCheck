@@ -26,6 +26,13 @@ public class Method {
     /*public boolean isAbstract() {
         return isAbstract;*/
     }
+    
+    public Method(String name, String returnType, String visibility) {
+        this.name = name;
+        this.returnType = returnType;
+        this.parameters = new ArrayList<String>();
+        this.visibility = visibility;
+    }
 
 	public String getName() {
 		return name;
@@ -46,13 +53,14 @@ public class Method {
 	public ArrayList<String> getParameters() {
 		return parameters;
 	}
-
-	public void setParameters(ArrayList<String> parameters) {
-		this.parameters = parameters;
-	}
 	
     public String getVisibility() {
         return visibility;
+    }
+    
+    // Only the type is kept in the Intermediate Model
+    public void addParameter(String parameter) {
+    	parameters.add(parameter);
     }
 
 }
