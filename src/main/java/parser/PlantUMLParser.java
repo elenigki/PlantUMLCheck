@@ -156,10 +156,14 @@ public class PlantUMLParser {
 			if (existing != null) {
 				existing.setClassType(ClassType.CLASS);
 				existing.setAbstract(isAbstract);
+				if(existing.getDeclaration() == ClassDeclaration.DUMMY) {
+					existing.setDeclaration( ClassDeclaration.OFFICIAL);
+					model.removeWarningsForClass(name);
+				}
 				return existing;
 			}
 
-			ClassInfo ci = new ClassInfo(name, ClassType.CLASS, isAbstract);
+			ClassInfo ci = new ClassInfo(name, ClassType.CLASS, isAbstract, ClassDeclaration.OFFICIAL);
 			model.addClass(ci);
 			return ci;
 		}
@@ -177,10 +181,14 @@ public class PlantUMLParser {
 			if (existing != null) {
 				existing.setClassType(ClassType.INTERFACE);
 				existing.setAbstract(true); // optional: interfaces are abstract
+				if(existing.getDeclaration() == ClassDeclaration.DUMMY) {
+					existing.setDeclaration( ClassDeclaration.OFFICIAL);
+					model.removeWarningsForClass(name);
+				}
 				return existing;
 			}
 
-			ClassInfo ci = new ClassInfo(name, ClassType.INTERFACE, true);
+			ClassInfo ci = new ClassInfo(name, ClassType.INTERFACE, true, ClassDeclaration.OFFICIAL);
 			model.addClass(ci);
 			return ci;
 		}
@@ -198,10 +206,14 @@ public class PlantUMLParser {
 			if (existing != null) {
 				existing.setClassType(ClassType.ENUM);
 				existing.setAbstract(false); // enums aren't abstract
+				if(existing.getDeclaration() == ClassDeclaration.DUMMY) {
+					existing.setDeclaration( ClassDeclaration.OFFICIAL);
+					model.removeWarningsForClass(name);
+				}
 				return existing;
 			}
 
-			ClassInfo ci = new ClassInfo(name, ClassType.ENUM);
+			ClassInfo ci = new ClassInfo(name, ClassType.ENUM, ClassDeclaration.OFFICIAL);
 			model.addClass(ci);
 			return ci;
 		}
@@ -413,8 +425,9 @@ public class PlantUMLParser {
 		if (ci != null)
 			return ci;
 
-		ci = new ClassInfo(name, defaultType);
+		ci = new ClassInfo(name, defaultType, ClassDeclaration.DUMMY);
 		model.addClass(ci);
+		model.addWarning("Class '" + name + "' not found in UML declarations. Added as dummy.");
 		return ci;
 	}
 

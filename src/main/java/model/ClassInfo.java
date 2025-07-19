@@ -10,20 +10,23 @@ public class ClassInfo {
 	private boolean isAbstract = false;
 	private ArrayList<Attribute> attributes;
 	private ArrayList<Method> methods;
+	private ClassDeclaration declaration;
 	
-	public ClassInfo(String name, ClassType classType) {
+	public ClassInfo(String name, ClassType classType, ClassDeclaration declaration) {
 		this.name = name;
 		this.classType = classType;
 		this.attributes = new ArrayList<>();
 		this.methods = new ArrayList<>();
+		this.declaration = declaration;
 	}
 	
-	public ClassInfo(String name, ClassType classType, boolean isAbstract) {
+	public ClassInfo(String name, ClassType classType, boolean isAbstract, ClassDeclaration declaration) {
 		this.name = name;
 		this.classType = classType;
 		this.isAbstract = isAbstract;
 		this.attributes = new ArrayList<>();
 		this.methods = new ArrayList<>();
+		this.declaration = declaration;
 	}
 	
 	// Add attribute (only allowed for classes)
@@ -82,6 +85,14 @@ public class ClassInfo {
     public Object getMetadata(String key) {
         return metadata.get(key);
     }
+
+	public ClassDeclaration getDeclaration() {
+		return declaration;
+	}
+
+	public void setDeclaration(ClassDeclaration declaration) {
+		this.declaration = declaration;
+	}
 
 
 }

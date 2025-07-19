@@ -166,7 +166,6 @@ public class JavaSourceParserTest {
 		assertTrue(warnings.stream().anyMatch(w -> w.contains("D")));
 	}
 
-//////////////// Previous Tests ////////////////
 	@Test
 	public void testMixedRelationships() throws Exception {
 		JavaSourceParser parser = new JavaSourceParser();
@@ -212,6 +211,10 @@ public class JavaSourceParserTest {
 			System.out.printf("[%s] %s -> %s\n", r.getType(), r.getSourceClass().getName(),
 					r.getTargetClass().getName());
 		}
+		
+		for(String w: model.getWarnings()) {
+			System.out.println("[WARNING]: "+ w);
+		}
 
 		assertNotNull(model.findClassByName("ComplexExample"));
 
@@ -252,6 +255,63 @@ public class JavaSourceParserTest {
 	    assertNull(getRelationship(model, "SetterAggregationExample", "Book", RelationshipType.AGGREGATION));
 
 	}
+	
+	@Test
+	void testMultilineMethodAndAttribute() throws Exception {
+	    File file = new File("src/test/resources/source_code_samples/MultilineExample.java");
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(file);
+
+	    assertEquals(1, model.getClasses().size());
+
+	    ClassInfo cls = model.getClasses().get(0);
+	    assertEquals("MultilineExample", cls.getName());
+
+	    // Check attribute
+	    assertEquals(1, cls.getAttributes().size());
+	    Attribute attr = cls.getAttributes().get(0);
+	    assertEquals("name", attr.getName());
+	    assertEquals("String", attr.getType());
+
+	    // Check method
+	    assertEquals(1, cls.getMethods().size());
+	    Method method = cls.getMethods().get(0);
+	    assertEquals("setName", method.getName());
+	    assertEquals("void", method.getReturnType());
+	    assertTrue(method.getParameters().contains("String"));
+	}
+
+	@Test
+	void testAdvancedMultilineParsing() throws Exception {
+	    File file = new File("src/test/resources/source_code_samples/AdvancedMultilineExample.java");
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(file);
+	    for(ClassInfo c: model.getClasses()) {
+	    	System.out.println("Class: "+ c.getName());
+	    }
+
+	    assertEquals(1, model.getClasses().size());
+	    ClassInfo cls = model.getClasses().get(0);
+	    assertEquals("AdvancedMultilineExample", cls.getName());
+
+	    // Attributes
+	    assertEquals(1, cls.getAttributes().size());
+	    Attribute attr = cls.getAttributes().get(0);
+	    assertEquals("books", attr.getName());
+	    assertTrue(attr.getType().contains("List"));
+
+	    // Methods
+	    assertEquals(2, cls.getMethods().size());
+	    List<String> methodNames = cls.getMethods().stream().map(Method::getName).toList();
+	    assertTrue(methodNames.contains("getPageMap"));
+	    assertTrue(methodNames.contains("setBooks"));
+
+	    // Relationships
+	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.COMPOSITION);
+	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.AGGREGATION);
+	    assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.DEPENDENCY);
+	}
+
 
 
 	// Helper to find a specific relationship between two classes
