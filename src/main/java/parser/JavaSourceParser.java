@@ -42,6 +42,9 @@ public class JavaSourceParser {
 	private void parseFile(File file) throws IOException {
 		List<String> rawLines = readLines(file);
 
+		System.out.println("\n========= RAW LINES from: " + file.getName() + " =========");
+		rawLines.forEach(System.out::println);
+
 		for (int i = 0; i < rawLines.size(); i++) {
 			String line = cleanLine(rawLines.get(i));
 			if (line.isEmpty())
@@ -63,14 +66,23 @@ public class JavaSourceParser {
 					i++;
 				}
 
+				System.out.println("\n--------- BODY LINES ---------");
+				bodyLines.forEach(System.out::println);
+
 				// Step 1: Remove all comments (single-line and multi-line)
 				List<String> noComments = cleanComments(bodyLines);
+				System.out.println("\n--------- AFTER cleanComments ---------");
+				noComments.forEach(System.out::println);
 
 				// Step 2: Join multi-line declarations (e.g. attributes, methods)
 				List<String> logicalLines = joinLogicalLines(noComments);
+				System.out.println("\n--------- AFTER joinLogicalLines ---------");
+				logicalLines.forEach(System.out::println);
 
 				// Step 3: Split any merged statements (e.g. "} public ...")
 				List<String> splitLines = splitMultipleStatements(logicalLines);
+				System.out.println("\n--------- AFTER splitMultipleStatements ---------");
+				splitLines.forEach(System.out::println);
 
 				// Parse attributes and methods from cleaned & structured lines
 				parseAttributes(splitLines, classInfo);
@@ -201,22 +213,37 @@ public class JavaSourceParser {
 		return classInfo;
 	}
 
-	// Returns existing ClassInfo or initializes a new one
+	// Returns existing ClassInfo or creates a new one if it doesn't exist
 	private ClassInfo getOrInitializeClass(String name, ClassType type, boolean isAbstract) {
-		Optional<ClassInfo> existing = model.getClasses().stream().filter(c -> c.getName().equals(name)).findFirst();
+		// Remove generics like "<Book>" from the class name
+		String cleaned = stripGenerics(name);
+
+		// Skip if it's a built-in Java type (like List, Map, etc.)
+		if (isJavaBuiltInType(cleaned)) {
+			return null;
+		}
+
+		// Try to find existing class with the cleaned name
+		Optional<ClassInfo> existing = model.getClasses().stream().filter(c -> c.getName().equals(cleaned)).findFirst();
 
 		if (existing.isPresent()) {
 			ClassInfo c = existing.get();
-		    if (c.getDeclaration() == ClassDeclaration.DUMMY) {
-		        c.setDeclaration(ClassDeclaration.OFFICIAL);
-		    }
+
+			// If it was a dummy, promote it to official
+			if (c.getDeclaration() == ClassDeclaration.DUMMY) {
+				c.setDeclaration(ClassDeclaration.OFFICIAL);
+			}
+
+			// Update with the correct type and abstract flag
 			c.setClassType(type);
 			c.setAbstract(isAbstract);
-			model.removeWarningsForClass(name);
 
+			// Remove any warning about this class being a dummy
+			model.removeWarningsForClass(cleaned);
 			return c;
 		} else {
-			ClassInfo c = new ClassInfo(name, type, isAbstract, ClassDeclaration.OFFICIAL);
+			// Create a new official class using the cleaned name
+			ClassInfo c = new ClassInfo(cleaned, type, isAbstract, ClassDeclaration.OFFICIAL);
 			model.addClass(c);
 			return c;
 		}
@@ -261,23 +288,26 @@ public class JavaSourceParser {
 	// Returns ClassInfo from model or creates a new one (unless it's a built-in
 	// Java type)
 	private ClassInfo getOrCreateClass(String className) {
+		System.out.println("[getOrCreateClass] Input name: " + className);
 
+		String cleaned = stripGenerics(className);
 		// Ignore built-in Java types
-		if (isJavaBuiltInType(className)) {
+		if (isJavaBuiltInType(cleaned)) {
+			System.out.println("[getOrCreateClass] Skipping built-in type: " + cleaned);
 			return null;
 		}
 
 		// If class already exists in model, return it
 		for (ClassInfo c : model.getClasses()) {
-			if (c.getName().equals(className)) {
+			if (c.getName().equals(cleaned)) {
 				return c;
 			}
 		}
 
 		// Otherwise, create a new "dummy" class and add it to the model
-		ClassInfo dummy = new ClassInfo(className, ClassType.CLASS, ClassDeclaration.DUMMY);
+		ClassInfo dummy = new ClassInfo(cleaned, ClassType.CLASS, ClassDeclaration.DUMMY);
 		model.addClass(dummy);
-		model.addWarning("Class '" + className + "' not found in source files. Added as dummy.");
+		model.addWarning("Class '" + cleaned + "' not found in source files. Added as dummy.");
 
 		return dummy;
 	}
@@ -301,7 +331,7 @@ public class JavaSourceParser {
 		String type = matcher.group(2).trim(); // full generic type
 		String name = matcher.group(3).trim();
 
-		return new Attribute(name, type, visibilitySymbol(visibility));
+		return new Attribute(name, normalizeType(type), visibilitySymbol(visibility));
 	}
 
 	// Maps visibility keyword to UML symbol
@@ -320,21 +350,30 @@ public class JavaSourceParser {
 			line = cleanLine(line);
 			if (isAttributeDeclaration(line)) {
 				Attribute attr = parseAttribute(line);
+				System.out.println("[parseAttributes] → line: " + line);
+				System.out.println("[parseAttributes] → parsed type: " + attr.getType() + ", name: " + attr.getName());
+
 				if (attr != null) {
 					classInfo.addAttribute(attr);
 
 					Set<String> types = extractGenericTypes(attr.getType());
+					System.out.println("[parseAttributes] → extracted generic types: " + types);
 
 					boolean isMainComposed = isComposedAttribute(line, attr.getType());
 					String declared = attr.getType();
 
 					for (String type : types) {
-						String cleaned = stripGenerics(type).trim();
+						System.out.println("[parseAttributes] → examining type: " + type);
+						System.out.println("[parseAttributes] → declared type string: " + declared);
+						if (type == null || type.isBlank())
+							continue;
+						String cleaned = stripGenerics(type);
 
-						if (!isJavaBuiltInType(type)) {
-							ClassInfo target = getOrCreateClass(type);
+						if (!isJavaBuiltInType(cleaned)) {
+							System.out.println("[parseAttributes] → creating/using class: " + cleaned);
+							ClassInfo target = getOrCreateClass(cleaned);
 							if (target != null) {
-								boolean isInComposedStructure = isMainComposed && declared.contains(type);
+								boolean isInComposedStructure = isMainComposed && declared.contains(cleaned);
 
 								RelationshipType relType = isInComposedStructure ? RelationshipType.COMPOSITION
 										: RelationshipType.ASSOCIATION;
@@ -360,7 +399,8 @@ public class JavaSourceParser {
 			"(\\w+)\\s*\\(([^)]*)\\)\\s*" // 6: method name, 7: parameters
 	);
 
-	private static final Pattern METHOD_HEADER_PATTERN = Pattern.compile("\\b(public|private|protected)\\b.*\\(.*\\)");
+	private static final Pattern METHOD_HEADER_PATTERN = Pattern
+			.compile("\\b(public|private|protected)\\b.*\\(.*\\)\\s*(\\{)?\\s*$");
 
 	// Checks if a type is a known Java built-in type
 	private boolean isJavaBuiltInType(String typeName) {
@@ -397,27 +437,42 @@ public class JavaSourceParser {
 		}
 
 		String headerLine = headerBuilder.toString().trim();
+		System.out.println("[parseMethod] Header line: " + headerLine);
 
 		// Match method signature
 		Matcher matcher = METHOD_PATTERN.matcher(headerLine);
-		if (!matcher.find())
+		if (!matcher.find()) {
+			if (!matcher.find()) {
+				System.out.println("[parseMethod] No match for header pattern.");
+				return null;
+			}
 			return null;
+		}
 
 		String visibilityKeyword = matcher.group(1); // public/private/etc
-		String returnType = matcher.group(5); // return type
+		String returnType = normalizeType(matcher.group(5)); // return type
 		String methodName = matcher.group(6); // method name
 		String paramList = matcher.group(7); // parameters inside (...)
+
+		System.out.println("[parseMethod] Name: " + methodName);
+		System.out.println("[parseMethod] Return type: " + returnType);
+		System.out.println("[parseMethod] Parameters raw: " + paramList);
 
 		boolean isConstructor = isConstructor(methodName, classInfo);
 		String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
 
-		Method method = new Method(methodName, stripGenerics(returnType), visibility);
+		Method method = new Method(methodName, returnType, visibility);
 
 		// Parse and track parameter types
 		Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
+		System.out.println("[parseMethod] Parameters extracted (name → type): " + paramNamesAndTypes);
 
 		// Add dependency from return type (if not constructor)
 		if (!isConstructor) {
+			if (!isConstructor) {
+				System.out.println("[parseMethod] → Processing return type: " + returnType);
+			}
+
 			processReturnType(returnType, classInfo);
 		}
 
@@ -426,6 +481,8 @@ public class JavaSourceParser {
 
 		// Add method to class (constructors are excluded)
 		if (!isConstructor) {
+			System.out.println("[parseMethod] → Method added to class: " + method.getName());
+
 			classInfo.addMethod(method);
 		}
 
@@ -447,11 +504,12 @@ public class JavaSourceParser {
 			String[] params = paramList.split(",");
 
 			for (String param : params) {
+
 				String[] parts = param.trim().split("\\s+");
 
 				// Must have type and name
 				if (parts.length >= 2) {
-					String type = parts[0];
+					String type = normalizeType(parts[0]);
 					String name = parts[1];
 
 					method.addParameter(type);
@@ -464,12 +522,18 @@ public class JavaSourceParser {
 					if (!isConstructor && !isJavaBuiltInType(cleaned)) {
 						ClassInfo dependency = getOrCreateClass(cleaned);
 						if (dependency != null) {
+							System.out.println("[parseParameters] Raw param: " + param);
+							System.out.println("[parseParameters] → type: " + type + ", name: " + name);
+							System.out.println("[parseParameters] → inner: " + inner + ", cleaned: " + cleaned);
+
 							model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.DEPENDENCY));
 						}
 					}
 
 					// For constructors, still ensure class exists (as dummy if needed)
 					if (isConstructor && !isJavaBuiltInType(cleaned)) {
+						System.out.println("[parseParameters] → creating/using class: " + cleaned);
+
 						getOrCreateClass(cleaned);
 					}
 				}
@@ -480,14 +544,19 @@ public class JavaSourceParser {
 	}
 
 	private void processReturnType(String returnType, ClassInfo classInfo) {
+		System.out.println("[processReturnType] Raw returnType: " + returnType);
+
 		if (returnType == null || returnType.equals("void"))
 			return;
 
 		Set<String> returnTypes = extractGenericTypesFromTypeSignature(returnType);
+		System.out.println("[processReturnType] → extracted types: " + returnTypes);
 
 		for (String type : returnTypes) {
 
 			if (!isJavaBuiltInType(type)) {
+				System.out.println("[processReturnType] → creating/using class: " + type);
+
 				ClassInfo dependency = getOrCreateClass(type);
 				if (dependency != null) {
 					model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.DEPENDENCY));
@@ -499,8 +568,9 @@ public class JavaSourceParser {
 	// checks method body for local relationships
 	private void analyzeMethodBody(String body, ClassInfo classInfo, String methodName, Map<String, String> params) {
 		extractNewInstanceDependencies(body, classInfo);
-		extractCompositionAssignments(body, classInfo);
 		extractAggregationAssignments(body, classInfo, methodName, params);
+		extractCompositionAssignments(body, classInfo);
+
 	}
 
 	// Extracts inner type from generics: List<People> → People
@@ -516,21 +586,22 @@ public class JavaSourceParser {
 	// Detects 'new SomeType()' usages inside method bodies and adds DEPENDENCY
 	// relationships
 	private void extractNewInstanceDependencies(String methodBody, ClassInfo currentClass) {
+		// Matches types used in 'new Type<...>()'
 		Pattern pattern = Pattern.compile("new\\s+([a-zA-Z_][a-zA-Z0-9_<>]*)\\s*\\(");
 		Matcher matcher = pattern.matcher(methodBody);
 
 		while (matcher.find()) {
 			String rawType = matcher.group(1);
 
-			// Remove generics, e.g., List<Book> → List
-			String cleanType = rawType.contains("<") ? rawType.substring(0, rawType.indexOf("<")) : rawType;
+			// Remove generic part, e.g. List<Book> → List
+			String cleaned = stripGenerics(rawType);
 
-			if (isJavaBuiltInType(cleanType)) {
+			// Ignore built-in types like List, Map, etc.
+			if (isJavaBuiltInType(cleaned)) {
 				continue;
 			}
 
-			// Check if it's part of 'this.x = new Type()' (likely composition, not
-			// dependency)
+			// Check if it's a field assignment like 'this.field = new Type()'
 			int start = matcher.start();
 			boolean isFieldAssignment = false;
 			if (start >= 6) {
@@ -540,23 +611,20 @@ public class JavaSourceParser {
 				}
 			}
 
+			// Only treat as dependency if it's not a field assignment (those are
+			// compositions)
 			if (!isFieldAssignment) {
-				// Ensure the target class exists
-				ClassInfo targetClass = model.findClassByName(cleanType);
-				if (targetClass == null) {
-					targetClass = new ClassInfo(cleanType, ClassType.CLASS, ClassDeclaration.DUMMY);
-					model.addClass(targetClass);
-					model.addWarning("Class '" + cleanType + "' not found in source files. Added as dummy.");
-
+				// Safely create or retrieve the target class
+				ClassInfo targetClass = getOrCreateClass(cleaned);
+				if (targetClass != null) {
+					Relationship relationship = new Relationship(currentClass, targetClass,
+							RelationshipType.DEPENDENCY);
+					model.addRelationship(relationship);
 				}
-
-				Relationship relationship = new Relationship(currentClass, targetClass, RelationshipType.DEPENDENCY);
-				model.addRelationship(relationship);
 			}
 		}
 	}
 
-	// Extracts all method declarations (with full bodies) from class lines
 	// Extracts all method declarations (with full bodies) from class lines
 	private void extractMethods(List<String> lines, ClassInfo currentClass) {
 		boolean collectingHeader = false;
@@ -566,19 +634,17 @@ public class JavaSourceParser {
 		StringBuilder headerBuffer = new StringBuilder();
 		StringBuilder methodBuffer = new StringBuilder();
 
-		for (String l : lines) {
-		}
-
 		for (String line : lines) {
-			if (!insideMethod) {
+			System.out.println("[extractMethods] Line: " + line);
 
-				if (line.matches(".*(public|private|protected).*\\(.*")) {
-				}
+			if (!insideMethod) {
 
 				if (!collectingHeader) {
 					// Look for start of method signature (must include a visibility keyword and "("
 					// )
-					if (line.matches(".*(public|private|protected).*\\(.*")) {
+					if (METHOD_HEADER_PATTERN.matcher(line).matches()) {
+						System.out.println("[extractMethods] → Start collecting method header: " + line);
+
 						headerBuffer.setLength(0);
 						headerBuffer.append(line).append(" ");
 
@@ -596,6 +662,8 @@ public class JavaSourceParser {
 							}
 
 							if (openBraces == 0) {
+								System.out.println("[extractMethods] → Passing to parseMethod(...)");
+
 								parseMethod(methodBuffer.toString(), currentClass);
 								insideMethod = false;
 							}
@@ -604,8 +672,13 @@ public class JavaSourceParser {
 						}
 					}
 				} else {
+					System.out.println("[extractMethods] → Continuing header: " + line);
+
 					headerBuffer.append(line).append(" ");
 					if (line.contains(")")) {
+						System.out.println("[extractMethods] → Method signature complete:");
+						System.out.println(headerBuffer.toString().trim());
+
 						collectingHeader = false;
 						insideMethod = true;
 						openBraces = countOccurrences(line, '{') - countOccurrences(line, '}');
@@ -617,6 +690,7 @@ public class JavaSourceParser {
 						}
 
 						if (openBraces == 0) {
+							System.out.println("[extractMethods] → Passing to parseMethod(...)");
 							parseMethod(methodBuffer.toString(), currentClass);
 							insideMethod = false;
 
@@ -624,10 +698,13 @@ public class JavaSourceParser {
 					}
 				}
 			} else {
+				System.out.println("[extractMethods] → Inside method body line: " + line);
 				methodBuffer.append(line).append("\n");
 				openBraces += countOccurrences(line, '{') - countOccurrences(line, '}');
 
 				if (openBraces <= 0) {
+					System.out.println("[extractMethods] → Full method block:");
+					System.out.println(methodBuffer.toString());
 
 					parseMethod(methodBuffer.toString(), currentClass);
 					insideMethod = false;
@@ -641,66 +718,92 @@ public class JavaSourceParser {
 		return (int) s.chars().filter(ch -> ch == c).count();
 	}
 
-	// Detects assignments like 'this.x = new Type()' and adds COMPOSITION
+	// Detects assignments like 'this.field = new Type()' and adds COMPOSITION
 	// relationships
 	private void extractCompositionAssignments(String methodBody, ClassInfo currentClass) {
+		// Match expressions like: this.field = new Type(...)
 		Pattern pattern = Pattern.compile("this\\.\\w+\\s*=\\s*new\\s+([a-zA-Z_][a-zA-Z0-9_<>]*)\\s*\\(");
 		Matcher matcher = pattern.matcher(methodBody);
 
 		while (matcher.find()) {
 			String rawType = matcher.group(1);
 
-			// Remove generics, e.g., List<Book> → List
-			String cleanType = rawType.contains("<") ? rawType.substring(0, rawType.indexOf("<")) : rawType;
+			// Remove generic part from the type (e.g. List<Book> → List)
+			String cleaned = stripGenerics(rawType);
 
-			if (isJavaBuiltInType(cleanType)) {
+			// Skip built-in Java types
+			if (isJavaBuiltInType(cleaned)) {
 				continue;
 			}
 
-			// Ensure the class exists
-			ClassInfo targetClass = model.findClassByName(cleanType);
-			if (targetClass == null) {
-				targetClass = new ClassInfo(cleanType, ClassType.CLASS, ClassDeclaration.DUMMY);
-				model.addClass(targetClass);
-				model.addWarning("Class '" + cleanType + "' not found in source files. Added as dummy.");
+			// Safely get or create the referenced class
+			ClassInfo targetClass = getOrCreateClass(cleaned);
+			if (targetClass != null) {
+				Relationship relationship = new Relationship(currentClass, targetClass, RelationshipType.COMPOSITION);
+				model.addRelationship(relationship);
 			}
-
-			Relationship relationship = new Relationship(currentClass, targetClass, RelationshipType.COMPOSITION);
-			model.addRelationship(relationship);
 		}
 	}
 
-	// Detects 'this.x = x;' and adds AGGREGATION if x is method parameter
-	// Applies in constructors and setters
+	// Detects assignments like 'this.field = parameter;' inside constructors or
+	// setters
+	// and adds AGGREGATION relationships based on parameter types
 	private void extractAggregationAssignments(String methodBody, ClassInfo currentClass, String methodName,
 			Map<String, String> paramNamesAndTypes) {
+
+// Only apply this logic in constructors or simple setters
 		boolean isConstructor = methodName.equals(currentClass.getName());
 		boolean isSetter = methodName.startsWith("set") && paramNamesAndTypes.size() == 1;
 
 		if (!(isConstructor || isSetter)) {
+			System.out.println("not a Constrructor/Setter: " + methodName);
 			return;
 		}
+
+		System.out.println("[aggregation] Total parameters: " + paramNamesAndTypes.size());
 
 		for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
 			String paramName = param.getKey();
 			String paramType = param.getValue();
+			System.out.println("[aggregation] paramName: '" + paramName + "' , paramType: '" + paramType + "'");
 
-			// Accept both: this.chapter = chapter;
-			// OR: this.mainChapter = chapter;
-			String patternString = "this\\.[a-zA-Z0-9_]+\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;";
-			Pattern pattern = Pattern.compile(patternString);
-			Matcher matcher = pattern.matcher(methodBody);
+// Extract all relevant types from the parameter type (e.g., List<Book> → [List, Book])
+			Set<String> types = extractGenericTypes(paramType);
 
-			if (matcher.find() && !isJavaBuiltInType(paramType)) {
-				ClassInfo target = model.findClassByName(paramType);
-				if (target == null) {
-					target = new ClassInfo(paramType, ClassType.CLASS, ClassDeclaration.DUMMY);
-					model.addClass(target);
-					model.addWarning("Class '" + paramType + "' not found in source files. Added as dummy.");
+			for (String raw : types) {
+				String cleaned = stripGenerics(raw);
+
+// Skip Java built-in types like List, Map, etc.
+				if (isJavaBuiltInType(cleaned)) {
+					System.out.println("[aggregation] Skipping built-in type: " + cleaned);
+					continue;
 				}
 
-				Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
-				model.addRelationship(rel);
+// Prepare to match lines like: this.books = books;
+				String patternString = "\\bthis\\.[a-zA-Z0-9_]+\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;";
+				String normalizedBody = methodBody.replaceAll("\\s+", " ");
+
+				System.out.println("[aggregation] normalizedBody: " + normalizedBody);
+				System.out.println("[aggregation] pattern: " + patternString);
+				System.out.println("[aggregation] READY TO MATCH param: " + paramName);
+
+				Matcher matcher = Pattern.compile(patternString).matcher(normalizedBody);
+
+				if (matcher.find()) {
+					System.out.println("[aggregation] MATCH FOUND for param: " + paramName);
+					ClassInfo target = getOrCreateClass(cleaned);
+					if (target != null) {
+						Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
+						model.addRelationship(rel);
+					}
+				} else {
+					System.out.println("[aggregation] NO MATCH for param: " + paramName);
+				}
+
+				System.out.println("[aggregation] methodName: " + methodName);
+				System.out.println("[aggregation] parameters passed in map: " + paramNamesAndTypes);
+				System.out.println("[aggregation] paramType: '" + paramType + "'");
+				System.out.println("[aggregation] methodBody:\n" + methodBody);
 			}
 		}
 	}
@@ -756,7 +859,10 @@ public class JavaSourceParser {
 		int angles = 0; // <>
 		int braces = 0; // not strictly needed but could help
 
+		System.out.println("\n[joinLogicalLines] --- START ---");
+
 		for (String rawLine : lines) {
+			System.out.println("[joinLogicalLines] Line in: " + rawLine);
 			String line = rawLine.trim();
 			if (line.isEmpty())
 				continue;
@@ -782,15 +888,21 @@ public class JavaSourceParser {
 			boolean isCompleteLine = line.endsWith(";") || line.endsWith("{");
 
 			if (parens <= 0 && angles <= 0 && isCompleteLine) {
-				result.add(current.toString().trim());
+				String completedLine = current.toString().trim();
+				System.out.println("[joinLogicalLines] → Completed logical line: " + completedLine);
+				result.add(completedLine);
 				current.setLength(0);
 			}
 		}
 
 		// Add any remaining line (could be last line or error case)
 		if (current.length() > 0) {
-			result.add(current.toString().trim());
+			String remaining = current.toString().trim();
+			System.out.println("[joinLogicalLines] → Final leftover line: " + remaining);
+			result.add(remaining);
 		}
+
+		System.out.println("[joinLogicalLines] --- END ---\n");
 
 		return result;
 	}
@@ -799,26 +911,41 @@ public class JavaSourceParser {
 	// separate lines
 	private List<String> splitMultipleStatements(List<String> lines) {
 		List<String> result = new ArrayList<>();
+		System.out.println("\n[splitMultipleStatements] --- START ---");
 		for (String line : lines) {
+			System.out.println("[splitMultipleStatements] Line in: " + line);
 			String[] parts = line.split("(?<=\\})\\s+(?=public|private|protected)");
 			for (String part : parts) {
-				if (!part.trim().isEmpty()) {
-					result.add(part.trim());
+				String trimmed = part.trim();
+				if (!trimmed.isEmpty()) {
+					System.out.println("[splitMultipleStatements] → Added: " + trimmed);
+					result.add(trimmed);
 				}
 			}
 		}
+		System.out.println("[splitMultipleStatements] --- END ---\n");
 		return result;
 	}
 
 	private Set<String> extractGenericTypesFromTypeSignature(String type) {
+
+		System.out.println("\n[extractGenericTypesFromTypeSignature] Input type: " + type);
 		Set<String> result = new HashSet<>();
-		type = type.replaceAll("[<>]", " ");
-		type = type.replaceAll(",", " ");
-		Matcher matcher = Pattern.compile("[A-Z][a-zA-Z0-9_]*").matcher(type);
+		String normalized = type.replaceAll("[<>]", " ").replaceAll(",", " ");
+		System.out.println("[extractGenericTypesFromTypeSignature] Normalized: " + normalized);
+
+		Matcher matcher = Pattern.compile("[A-Z][a-zA-Z0-9_]*").matcher(normalized);
 		while (matcher.find()) {
-			result.add(matcher.group());
+			String extracted = matcher.group();
+			result.add(extracted);
+			System.out.println("[extractGenericTypesFromTypeSignature] → Found: " + extracted);
 		}
+		System.out.println("[extractGenericTypesFromTypeSignature] Final result: " + result);
 		return result;
+	}
+
+	private String normalizeType(String type) {
+		return type.replaceAll("\\s*<\\s*", "<").replaceAll("\\s*>\\s*", ">").replaceAll("\\s*,\\s*", ",").trim();
 	}
 
 }

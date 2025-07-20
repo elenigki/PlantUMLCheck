@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -286,31 +287,100 @@ public class JavaSourceParserTest {
 	    File file = new File("src/test/resources/source_code_samples/AdvancedMultilineExample.java");
 	    JavaSourceParser parser = new JavaSourceParser();
 	    IntermediateModel model = parser.parse(file);
+
 	    for(ClassInfo c: model.getClasses()) {
-	    	System.out.println("Class: "+ c.getName());
+	    	 System.out.println("Class: " + c.getName() + " , Declaration: " + c.getDeclaration());
+	    	 for(Attribute a: c.getAttributes()) {
+	    		 if(!a.getName().isEmpty()) {
+	    			 System.out.println("Attributes: " + a.getName() + ", Type: " + a.getType()); 
+	    		 }
+	    	 }
+	    	 
+	    }
+	    
+	    for(Relationship r: model.getRelationships()) {
+	    	System.out.println("["+ r.getType()+"] Source: "+ r.getSourceClass().getName() + " Target: " + r.getTargetClass().getName());
+	    }
+	    
+	    
+	   
+	    // ======= Class Count =======
+	    assertEquals(3, model.getClasses().size(), "Expected 1 official class and 2 dummy classes.");
+
+	    long officialCount = model.getClasses().stream()
+	        .filter(c -> c.getDeclaration() == ClassDeclaration.OFFICIAL)
+	        .count();
+	    long dummyCount = model.getClasses().stream()
+	        .filter(c -> c.getDeclaration() == ClassDeclaration.DUMMY)
+	        .count();
+	    
+	    
+
+	    assertEquals(1, officialCount, "Expected 1 official class.");
+	    assertEquals(2, dummyCount, "Expected 2 dummy classes (Book, Page).");
+
+	    // ======= Class Info =======
+	    ClassInfo cls = model.findClassByName("AdvancedMultilineExample");
+	    assertNotNull(cls, "Class 'AdvancedMultilineExample' should exist.");
+	    assertEquals(ClassDeclaration.OFFICIAL, cls.getDeclaration());
+	    
+	 // ======= Class Names and Declarations =======
+	    Map<String, ClassDeclaration> expectedClasses = Map.of(
+	        "AdvancedMultilineExample", ClassDeclaration.OFFICIAL,
+	        "Book", ClassDeclaration.DUMMY,
+	        "Page", ClassDeclaration.DUMMY
+	    );
+
+	    for (Map.Entry<String, ClassDeclaration> entry : expectedClasses.entrySet()) {
+	        String className = entry.getKey();
+	        ClassDeclaration expectedDeclaration = entry.getValue();
+
+	        ClassInfo classInfo = model.findClassByName(className);
+	        assertNotNull(classInfo, "Expected class: " + className);
+	        assertEquals(expectedDeclaration, classInfo.getDeclaration(), "Class " + className + " should be declared as " + expectedDeclaration);
 	    }
 
-	    assertEquals(1, model.getClasses().size());
-	    ClassInfo cls = model.getClasses().get(0);
-	    assertEquals("AdvancedMultilineExample", cls.getName());
 
-	    // Attributes
-	    assertEquals(1, cls.getAttributes().size());
-	    Attribute attr = cls.getAttributes().get(0);
-	    assertEquals("books", attr.getName());
-	    assertTrue(attr.getType().contains("List"));
+	    // ======= Attributes =======
+	    List<Attribute> attributes = cls.getAttributes();
+	    assertEquals(1, attributes.size(), "Expected one attribute.");
+	    Attribute booksAttr = attributes.get(0);
+	    assertEquals("books", booksAttr.getName());
+	    assertEquals("List<Book>", booksAttr.getType());
+	    assertEquals("-", booksAttr.getVisibility());
 
-	    // Methods
-	    assertEquals(2, cls.getMethods().size());
-	    List<String> methodNames = cls.getMethods().stream().map(Method::getName).toList();
-	    assertTrue(methodNames.contains("getPageMap"));
-	    assertTrue(methodNames.contains("setBooks"));
+	    // ======= Methods =======
+	    List<Method> methods = cls.getMethods();
+	    assertEquals(2, methods.size(), "Expected two methods.");
 
-	    // Relationships
+	    Method getPageMap = methods.stream()
+	        .filter(m -> m.getName().equals("getPageMap"))
+	        .findFirst().orElse(null);
+	    assertNotNull(getPageMap);
+	    assertEquals("Map<String,List<Page>>", getPageMap.getReturnType().replaceAll("\\s+", ""));
+	    assertEquals("+", getPageMap.getVisibility());
+	    assertEquals(List.of("String"), getPageMap.getParameters());
+
+	    Method setBooks = methods.stream()
+	        .filter(m -> m.getName().equals("setBooks"))
+	        .findFirst().orElse(null);
+	    assertNotNull(setBooks);
+	    assertEquals("void", setBooks.getReturnType());
+	    assertEquals("+", setBooks.getVisibility());
+	    assertEquals(List.of("List<Book>"), setBooks.getParameters());
+
+	    // ======= Relationships =======
 	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.COMPOSITION);
 	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.AGGREGATION);
 	    assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.DEPENDENCY);
+
+	    // ======= Dummy Class Warnings =======
+	    List<String> warnings = model.getWarnings();
+	    assertEquals(2, warnings.size(), "Expected 2 warnings for dummy classes.");
+	    assertTrue(warnings.stream().anyMatch(w -> w.contains("Book")));
+	    assertTrue(warnings.stream().anyMatch(w -> w.contains("Page")));
 	}
+
 
 
 
