@@ -6,6 +6,8 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static parser.JavaParsingUtils.*;
+
 
 /**
  * JavaSourceParser parses one or more Java files and builds an
@@ -14,6 +16,7 @@ import java.util.regex.Pattern;
 public class JavaSourceParser {
 
 	private final IntermediateModel model;
+	private final JavaSourcePreprocessor preprocessor = new JavaSourcePreprocessor();
 
 	// Initializes empty model and warnings
 	public JavaSourceParser() {
@@ -40,13 +43,13 @@ public class JavaSourceParser {
 
 	// Parses a single Java file
 	private void parseFile(File file) throws IOException {
-		List<String> rawLines = readLines(file);
+		List<String> rawLines = preprocessor.readLines(file);
 
 		System.out.println("\n========= RAW LINES from: " + file.getName() + " =========");
 		rawLines.forEach(System.out::println);
 
 		for (int i = 0; i < rawLines.size(); i++) {
-			String line = cleanLine(rawLines.get(i));
+			String line = preprocessor.cleanLine(rawLines.get(i));
 			if (line.isEmpty())
 				continue;
 
@@ -70,17 +73,17 @@ public class JavaSourceParser {
 				bodyLines.forEach(System.out::println);
 
 				// Step 1: Remove all comments (single-line and multi-line)
-				List<String> noComments = cleanComments(bodyLines);
+				List<String> noComments = preprocessor.cleanComments(bodyLines);
 				System.out.println("\n--------- AFTER cleanComments ---------");
 				noComments.forEach(System.out::println);
 
 				// Step 2: Join multi-line declarations (e.g. attributes, methods)
-				List<String> logicalLines = joinLogicalLines(noComments);
+				List<String> logicalLines = preprocessor.joinLogicalLines(noComments);
 				System.out.println("\n--------- AFTER joinLogicalLines ---------");
 				logicalLines.forEach(System.out::println);
 
 				// Step 3: Split any merged statements (e.g. "} public ...")
-				List<String> splitLines = splitMultipleStatements(logicalLines);
+				List<String> splitLines = preprocessor.splitMultipleStatements(logicalLines);
 				System.out.println("\n--------- AFTER splitMultipleStatements ---------");
 				splitLines.forEach(System.out::println);
 
@@ -89,85 +92,6 @@ public class JavaSourceParser {
 				extractMethods(splitLines, classInfo);
 			}
 		}
-	}
-
-	// Counts braces to find block scope
-	private int countBraces(String line) {
-		int open = 0, close = 0;
-		for (char c : line.toCharArray()) {
-			if (c == '{')
-				open++;
-			if (c == '}')
-				close++;
-		}
-		return open - close;
-	}
-
-	// Reads all lines of a file
-	private List<String> readLines(File file) throws IOException {
-		List<String> lines = new ArrayList<>();
-		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-			String line;
-			while ((line = reader.readLine()) != null) {
-				lines.add(line);
-			}
-		}
-		return lines;
-	}
-
-	// Removes comments and trims whitespace
-	private String cleanLine(String line) {
-		if (line == null)
-			return "";
-		int commentIndex = line.indexOf("//");
-		if (commentIndex != -1) {
-			line = line.substring(0, commentIndex);
-		}
-		line = line.replace("/*", "").replace("*/", "");
-		return line.trim();
-	}
-
-	// Removes // and /* */ comments from a list of lines
-	private List<String> cleanComments(List<String> lines) {
-		List<String> result = new ArrayList<>();
-		boolean inBlockComment = false;
-
-		for (String line : lines) {
-			String trimmed = line.trim();
-
-			if (inBlockComment) {
-				if (trimmed.contains("*/")) {
-					inBlockComment = false;
-					// Remove up to and including */
-					trimmed = trimmed.substring(trimmed.indexOf("*/") + 2).trim();
-					if (trimmed.isEmpty())
-						continue;
-				} else {
-					continue; // skip whole line
-				}
-			}
-
-			if (trimmed.contains("/*")) {
-				inBlockComment = true;
-				// Keep part before /*
-				trimmed = trimmed.substring(0, trimmed.indexOf("/*")).trim();
-			}
-
-			// Remove // comments
-			if (trimmed.contains("//")) {
-				trimmed = trimmed.substring(0, trimmed.indexOf("//")).trim();
-			}
-
-			if (trimmed.startsWith("@")) {
-				continue; // Ignore annotations like @Override, @Deprecated, etc.
-			}
-
-			if (!trimmed.isEmpty()) {
-				result.add(trimmed);
-			}
-		}
-
-		return result;
 	}
 
 	// Pattern to detect class, interface, enum
@@ -334,20 +258,11 @@ public class JavaSourceParser {
 		return new Attribute(name, normalizeType(type), visibilitySymbol(visibility));
 	}
 
-	// Maps visibility keyword to UML symbol
-	private String visibilitySymbol(String keyword) {
-		return switch (keyword) {
-		case "private" -> "-";
-		case "public" -> "+";
-		case "protected" -> "#";
-		default -> "~";
-		};
-	}
 
 	// Parses a list of lines for attributes
 	private void parseAttributes(List<String> lines, ClassInfo classInfo) {
 		for (String line : lines) {
-			line = cleanLine(line);
+			line = preprocessor.cleanLine(line);
 			if (isAttributeDeclaration(line)) {
 				Attribute attr = parseAttribute(line);
 				System.out.println("[parseAttributes] → line: " + line);
@@ -388,10 +303,7 @@ public class JavaSourceParser {
 		}
 	}
 
-	// Removes generic type parameters: List<String> → List
-	private String stripGenerics(String type) {
-		return type.replaceAll("<.*?>", "");
-	}
+
 
 	private static final Pattern METHOD_PATTERN = Pattern.compile("^(public|protected|private)?\\s*" + // 1: visibility
 			"(static\\s+)?(final\\s+)?(abstract\\s+)?\\s*" + // 2-4: modifiers
@@ -402,14 +314,6 @@ public class JavaSourceParser {
 	private static final Pattern METHOD_HEADER_PATTERN = Pattern
 			.compile("\\b(public|private|protected)\\b.*\\(.*\\)\\s*(\\{)?\\s*$");
 
-	// Checks if a type is a known Java built-in type
-	private boolean isJavaBuiltInType(String typeName) {
-		return List.of("int", "long", "double", "float", "char", "byte", "short", "boolean", "void", "Integer", "Long",
-				"Double", "Float", "Character", "Byte", "Short", "Boolean", "String", "Object", "List", "Map", "Set",
-				"ArrayList", "HashMap", "HashSet", "Optional", "Queue", "Deque", "LinkedList", "TreeMap", "TreeSet",
-				"LinkedHashMap", "LinkedHashSet", "LocalDate", "LocalTime", "LocalDateTime", "ZonedDateTime",
-				"Duration", "Period", "BigDecimal", "BigInteger").contains(typeName);
-	}
 
 	// Parses a full method body string into a Method object
 	private Method parseMethod(String methodBody, ClassInfo classInfo) {
@@ -849,103 +753,4 @@ public class JavaSourceParser {
 		}
 		return types;
 	}
-
-	// Joins lines that belong to the same logical declaration (e.g. attributes,
-	// method headers)
-	private List<String> joinLogicalLines(List<String> lines) {
-		List<String> result = new ArrayList<>();
-		StringBuilder current = new StringBuilder();
-		int parens = 0; // ()
-		int angles = 0; // <>
-		int braces = 0; // not strictly needed but could help
-
-		System.out.println("\n[joinLogicalLines] --- START ---");
-
-		for (String rawLine : lines) {
-			System.out.println("[joinLogicalLines] Line in: " + rawLine);
-			String line = rawLine.trim();
-			if (line.isEmpty())
-				continue;
-
-			// Count open/close brackets to detect multi-line blocks
-			for (char c : line.toCharArray()) {
-				if (c == '(')
-					parens++;
-				if (c == ')')
-					parens--;
-				if (c == '<')
-					angles++;
-				if (c == '>')
-					angles--;
-				if (c == '{')
-					braces++;
-				if (c == '}')
-					braces--;
-			}
-
-			current.append(line).append(" ");
-
-			boolean isCompleteLine = line.endsWith(";") || line.endsWith("{");
-
-			if (parens <= 0 && angles <= 0 && isCompleteLine) {
-				String completedLine = current.toString().trim();
-				System.out.println("[joinLogicalLines] → Completed logical line: " + completedLine);
-				result.add(completedLine);
-				current.setLength(0);
-			}
-		}
-
-		// Add any remaining line (could be last line or error case)
-		if (current.length() > 0) {
-			String remaining = current.toString().trim();
-			System.out.println("[joinLogicalLines] → Final leftover line: " + remaining);
-			result.add(remaining);
-		}
-
-		System.out.println("[joinLogicalLines] --- END ---\n");
-
-		return result;
-	}
-
-	// Splits lines that contain multiple statements (e.g. "} public ...") into
-	// separate lines
-	private List<String> splitMultipleStatements(List<String> lines) {
-		List<String> result = new ArrayList<>();
-		System.out.println("\n[splitMultipleStatements] --- START ---");
-		for (String line : lines) {
-			System.out.println("[splitMultipleStatements] Line in: " + line);
-			String[] parts = line.split("(?<=\\})\\s+(?=public|private|protected)");
-			for (String part : parts) {
-				String trimmed = part.trim();
-				if (!trimmed.isEmpty()) {
-					System.out.println("[splitMultipleStatements] → Added: " + trimmed);
-					result.add(trimmed);
-				}
-			}
-		}
-		System.out.println("[splitMultipleStatements] --- END ---\n");
-		return result;
-	}
-
-	private Set<String> extractGenericTypesFromTypeSignature(String type) {
-
-		System.out.println("\n[extractGenericTypesFromTypeSignature] Input type: " + type);
-		Set<String> result = new HashSet<>();
-		String normalized = type.replaceAll("[<>]", " ").replaceAll(",", " ");
-		System.out.println("[extractGenericTypesFromTypeSignature] Normalized: " + normalized);
-
-		Matcher matcher = Pattern.compile("[A-Z][a-zA-Z0-9_]*").matcher(normalized);
-		while (matcher.find()) {
-			String extracted = matcher.group();
-			result.add(extracted);
-			System.out.println("[extractGenericTypesFromTypeSignature] → Found: " + extracted);
-		}
-		System.out.println("[extractGenericTypesFromTypeSignature] Final result: " + result);
-		return result;
-	}
-
-	private String normalizeType(String type) {
-		return type.replaceAll("\\s*<\\s*", "<").replaceAll("\\s*>\\s*", ">").replaceAll("\\s*,\\s*", ",").trim();
-	}
-
 }
