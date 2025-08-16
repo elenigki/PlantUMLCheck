@@ -430,7 +430,7 @@ public class JavaSourceParser {
 							System.out.println("[parseParameters] → type: " + type + ", name: " + name);
 							System.out.println("[parseParameters] → inner: " + inner + ", cleaned: " + cleaned);
 
-							model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.DEPENDENCY));
+							model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.ASSOCIATION));
 						}
 					}
 
@@ -463,7 +463,7 @@ public class JavaSourceParser {
 
 				ClassInfo dependency = getOrCreateClass(type);
 				if (dependency != null) {
-					model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.DEPENDENCY));
+					model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.ASSOCIATION));
 				}
 			}
 		}
@@ -522,7 +522,7 @@ public class JavaSourceParser {
 				ClassInfo targetClass = getOrCreateClass(cleaned);
 				if (targetClass != null) {
 					Relationship relationship = new Relationship(currentClass, targetClass,
-							RelationshipType.DEPENDENCY);
+							RelationshipType.ASSOCIATION);
 					model.addRelationship(relationship);
 				}
 			}

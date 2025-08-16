@@ -106,8 +106,8 @@ public class JavaSourceParserTest {
 		assertEquals("Message", send.getParameters().get(0));
 
 		// Use relationship assertions
-		assertRelationshipExists(model, "User", "Message", RelationshipType.DEPENDENCY);
-		assertRelationshipExists(model, "User", "Name", RelationshipType.DEPENDENCY);
+		assertRelationshipExists(model, "User", "Message", RelationshipType.ASSOCIATION);
+		assertRelationshipExists(model, "User", "Name", RelationshipType.ASSOCIATION);
 	}
 
 	@Test
@@ -154,9 +154,9 @@ public class JavaSourceParserTest {
 
 		// Check relationships
 		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "A", RelationshipType.ASSOCIATION));
-		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "B", RelationshipType.DEPENDENCY));
-		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "C", RelationshipType.DEPENDENCY));
-		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "D", RelationshipType.DEPENDENCY));
+		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "B", RelationshipType.ASSOCIATION));
+		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "C", RelationshipType.ASSOCIATION));
+		assertNotNull(getRelationship(model, "ReferenceMissingPerUse", "D", RelationshipType.ASSOCIATION));
 
 		// Check warnings
 		List<String> warnings = model.getWarnings();
@@ -190,8 +190,8 @@ public class JavaSourceParserTest {
 		assertNotNull(getRelationship(model, "MixedExample", "Book", RelationshipType.ASSOCIATION));
 		assertNotNull(getRelationship(model, "MixedExample", "Page", RelationshipType.COMPOSITION));
 		assertNotNull(getRelationship(model, "MixedExample", "Chapter", RelationshipType.AGGREGATION));
-		assertNotNull(getRelationship(model, "MixedExample", "Printer", RelationshipType.DEPENDENCY));
-		assertNotNull(getRelationship(model, "MixedExample", "Scanner", RelationshipType.DEPENDENCY));
+		assertNotNull(getRelationship(model, "MixedExample", "Printer", RelationshipType.ASSOCIATION));
+		assertNotNull(getRelationship(model, "MixedExample", "Scanner", RelationshipType.ASSOCIATION));
 
 		// Check that missing classes are captured with warnings
 		List<String> warnings = model.getWarnings();
@@ -226,8 +226,8 @@ public class JavaSourceParserTest {
 		assertRelationshipExists(model, "ComplexExample", "Section", RelationshipType.COMPOSITION);
 
 		// DEPENDENCIES from parameters and return types
-		assertRelationshipExists(model, "ComplexExample", "Page", RelationshipType.DEPENDENCY);
-		assertRelationshipExists(model, "ComplexExample", "Chapter", RelationshipType.DEPENDENCY);
+		assertRelationshipExists(model, "ComplexExample", "Page", RelationshipType.ASSOCIATION);
+		assertRelationshipExists(model, "ComplexExample", "Chapter", RelationshipType.ASSOCIATION);
 
 		// Warnings for missing referenced classes
 		List<String> warnings = model.getWarnings();
@@ -372,7 +372,7 @@ public class JavaSourceParserTest {
 	    // ======= Relationships =======
 	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.COMPOSITION);
 	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.AGGREGATION);
-	    assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.DEPENDENCY);
+	    assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.ASSOCIATION);
 
 	    // ======= Dummy Class Warnings =======
 	    List<String> warnings = model.getWarnings();
