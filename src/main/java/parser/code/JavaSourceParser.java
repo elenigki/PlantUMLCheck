@@ -1,12 +1,13 @@
-package parser;
+package parser.code;
 
 import model.*;
+
+import static parser.code.JavaParsingUtils.*;
 
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import static parser.JavaParsingUtils.*;
 
 
 /**

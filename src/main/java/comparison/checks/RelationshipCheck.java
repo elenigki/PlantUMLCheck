@@ -1,0 +1,261 @@
+package comparison.checks;
+
+import comparison.CheckMode;
+import comparison.issues.Difference;
+import comparison.issues.IssueKind;
+import comparison.issues.IssueLevel;
+import model.IntermediateModel;
+import model.Relationship;
+import model.RelationshipType;
+
+import java.util.*;
+
+/** Relationship checks across the whole model. */
+public final class RelationshipCheck {
+
+    /** Compares relationships between code and UML. */
+    public static List<Difference> compareRelationships(IntermediateModel code,
+                                                        IntermediateModel uml,
+                                                        CheckMode mode) {
+        List<Difference> out = new ArrayList<>();
+
+        Map<String, Map<String, List<Relationship>>> codeBy = byPair(code.getRelationships());
+        Map<String, Map<String, List<Relationship>>> umlBy  = byPair(uml.getRelationships());
+
+        // walk all A->B pairs seen on either side
+        Set<String> allA = new LinkedHashSet<>();
+        allA.addAll(codeBy.keySet());
+        allA.addAll(umlBy.keySet());
+
+        for (String a : allA) {
+            Set<String> allB = new LinkedHashSet<>();
+            if (codeBy.containsKey(a)) allB.addAll(codeBy.get(a).keySet());
+            if (umlBy.containsKey(a))  allB.addAll(umlBy.get(a).keySet());
+
+            for (String b : allB) {
+                List<Relationship> cEdges = codeBy.getOrDefault(a, Map.of()).getOrDefault(b, List.of());
+                List<Relationship> uEdges = umlBy.getOrDefault(a, Map.of()).getOrDefault(b, List.of());
+
+                compareInheritanceBetween(a, b, cEdges, uEdges, mode, out);
+                compareOwnershipBetween(a, b, cEdges, uEdges, mode, out);
+                compareDependencyBetween(a, b, cEdges, uEdges, mode, out);
+            }
+        }
+
+        return out;
+    }
+
+    /** Groups edges as A -> (B -> list of edges). */
+    static Map<String, Map<String, List<Relationship>>> byPair(List<Relationship> rels) {
+        Map<String, Map<String, List<Relationship>>> m = new LinkedHashMap<>();
+        if (rels == null) return m;
+        for (Relationship r : rels) {
+            if (r == null || r.getSourceClass() == null || r.getTargetClass() == null) continue;
+            String a = ns(r.getSourceClass().getName());
+            String b = ns(r.getTargetClass().getName());
+            if (a.isEmpty() || b.isEmpty()) continue;
+            m.computeIfAbsent(a, x -> new LinkedHashMap<>())
+             .computeIfAbsent(b, x -> new ArrayList<>())
+             .add(r);
+        }
+        return m;
+    }
+
+    /** Compares inheritance/contract (extends/implements) for one A->B pair. */
+    static void compareInheritanceBetween(String a, String b,
+                                          List<Relationship> codeEdges,
+                                          List<Relationship> umlEdges,
+                                          CheckMode mode,
+                                          List<Difference> out) {
+        boolean codeGen  = has(codeEdges, RelationshipType.GENERALIZATION);
+        boolean umlGen   = has(umlEdges, RelationshipType.GENERALIZATION);
+        boolean codeReal = has(codeEdges, RelationshipType.REALIZATION);
+        boolean umlReal  = has(umlEdges, RelationshipType.REALIZATION);
+
+        // GENERALIZATION
+        if (codeGen && !umlGen) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    a + " -> " + b,
+                    "Missing GENERALIZATION in UML",
+                    "missing", "GENERALIZATION",
+                    "Add extends edge to UML"
+            ));
+        } else if (!codeGen && umlGen) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISSING_IN_CODE,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    a + " -> " + b,
+                    "GENERALIZATION present in UML but not in code",
+                    "GENERALIZATION", "missing",
+                    "Remove or fix extends in UML"
+            ));
+        }
+
+        // REALIZATION
+        if (codeReal && !umlReal) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    a + " -> " + b,
+                    "Missing REALIZATION in UML",
+                    "missing", "REALIZATION",
+                    "Add implements edge to UML"
+            ));
+        } else if (!codeReal && umlReal) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISSING_IN_CODE,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    a + " -> " + b,
+                    "REALIZATION present in UML but not in code",
+                    "REALIZATION", "missing",
+                    "Remove or fix implements in UML"
+            ));
+        }
+    }
+
+    /** Compares ownership (composition > aggregation > association) for one A->B pair. */
+    static void compareOwnershipBetween(String a, String b,
+                                        List<Relationship> codeEdges,
+                                        List<Relationship> umlEdges,
+                                        CheckMode mode,
+                                        List<Difference> out) {
+        RelationshipType codeOwn = strongestOwnership(codeEdges);
+        RelationshipType umlOwn  = strongestOwnership(umlEdges);
+
+        String where = a + " -> " + b;
+
+        // nothing on both sides → done
+        if (codeOwn == null && umlOwn == null) return;
+
+        // only UML has ownership
+        if (codeOwn == null && umlOwn != null) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISMATCH,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    where,
+                    "UML shows ownership but code does not",
+                    umlOwn.name(), "missing",
+                    "Downgrade/remove UML ownership or reflect it in code"
+            ));
+            return;
+        }
+
+     // only code has ownership
+        if (codeOwn != null && umlOwn == null) {
+            // NEW: if UML has a DEPENDENCY, let the dependency check handle it (avoid duplicate)
+            boolean umlHasDependency = has(umlEdges, RelationshipType.DEPENDENCY);
+            if (umlHasDependency) return;
+
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    where,
+                    "Code shows ownership but UML is missing it",
+                    "missing", codeOwn.name(),
+                    "Add ownership to UML"
+            ));
+            return;
+        }
+
+        // both have: compare strength
+        int c = strength(codeOwn);
+        int u = strength(umlOwn);
+        if (c > u) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISMATCH,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    where,
+                    "UML is weaker than code (ownership)",
+                    umlOwn.name(), codeOwn.name(),
+                    "Upgrade UML ownership to match code"
+            ));
+        } else if (c < u) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISMATCH,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    where,
+                    "UML is stronger than code (ownership)",
+                    umlOwn.name(), codeOwn.name(),
+                    "Downgrade UML ownership to match code"
+            ));
+        }
+        // if equal → OK (extra weaker UML edges would be an improvement; we can add later if you want)
+    }
+
+    /** Handles dependency policy (always advisory). */
+    static void compareDependencyBetween(String a, String b,
+                                         List<Relationship> codeEdges,
+                                         List<Relationship> umlEdges,
+                                         CheckMode mode,
+                                         List<Difference> out) {
+        boolean codeDep = has(codeEdges, RelationshipType.DEPENDENCY);
+        boolean umlDep  = has(umlEdges, RelationshipType.DEPENDENCY);
+
+        RelationshipType codeOwn = strongestOwnership(codeEdges);
+        RelationshipType umlOwn  = strongestOwnership(umlEdges);
+
+        String where = a + " -> " + b;
+
+        // If UML has only dependency but code has stronger → underclaimed
+        if (umlDep && codeOwn != null) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISMATCH,
+                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
+                    where,
+                    "UML shows DEPENDENCY but code shows stronger relation",
+                    "DEPENDENCY", codeOwn.name(),
+                    "Upgrade UML to " + codeOwn.name()
+            ));
+            return;
+        }
+
+        // Dependency only (no stronger in code or UML) → advisory/noise
+        if (umlDep && codeOwn == null) {
+            out.add(new Difference(
+                    IssueKind.RELATIONSHIP_MISMATCH,
+                    IssueLevel.SUGGESTION,
+                    where,
+                    "Dependency may be noise",
+                    "DEPENDENCY", "—",
+                    "Consider removing or replacing with a stronger relation if intended"
+            ));
+        }
+
+        // Code-only dependency (UML omitted) → OK in both modes (dependencies optional)
+        // Intentionally no difference emitted
+    }
+
+    // --- small helpers ---
+
+    private static boolean has(List<Relationship> edges, RelationshipType t) {
+        if (edges == null) return false;
+        for (Relationship r : edges) if (r != null && r.getType() == t) return true;
+        return false;
+    }
+
+    private static RelationshipType strongestOwnership(List<Relationship> edges) {
+        RelationshipType best = null;
+        int bestRank = 0;
+        if (edges == null) return null;
+        for (Relationship r : edges) {
+            if (r == null) continue;
+            int rank = strength(r.getType());
+            if (rank > bestRank) { best = r.getType(); bestRank = rank; }
+        }
+        return best;
+    }
+
+    private static int strength(RelationshipType t) {
+        if (t == null) return 0;
+        switch (t) {
+            case COMPOSITION: return 3;
+            case AGGREGATION: return 2;
+            case ASSOCIATION: return 1;
+            default: return 0; // GENERALIZATION/REALIZATION/DEPENDENCY not in ownership ladder
+        }
+    }
+
+    private static String ns(String s) { return (s == null || s.isBlank()) ? "" : s.trim(); }
+}

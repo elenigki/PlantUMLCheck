@@ -1,6 +1,8 @@
 package parser;
 
 import model.*;
+import parser.uml.PlantUMLParser;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -1,4 +1,4 @@
-package parser;
+package parser.uml;
 
 import model.*;
 import java.io.*;

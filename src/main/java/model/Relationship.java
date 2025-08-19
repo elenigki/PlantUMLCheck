@@ -1,10 +1,12 @@
 package model;
 
+import comparison.CheckMode;
+
 public class Relationship {
     private ClassInfo sourceClass;
     private ClassInfo targetClass;
     private RelationshipType type;
-    private StrictnessLevel strictnessLevel = StrictnessLevel.STRICT; // default STRICT
+    private CheckMode strictnessLevel = CheckMode.STRICT; // default STRICT
     //private String details; // multiplicity
     
     public Relationship(ClassInfo sourceClass, ClassInfo targetClass, RelationshipType type) {
@@ -38,11 +40,11 @@ public class Relationship {
 		this.type = type;
 	}
 	
-    public StrictnessLevel getStrictnessLevel() {
+    public CheckMode getStrictnessLevel() {
         return strictnessLevel;
     }
 
-    public void setStrictnessLevel(StrictnessLevel level) {
+    public void setStrictnessLevel(CheckMode level) {
         this.strictnessLevel = level;
     }
 

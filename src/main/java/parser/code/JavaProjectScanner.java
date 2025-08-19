@@ -1,6 +1,7 @@
-package parser;
+package parser.code;
 
 import model.ClassType;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;

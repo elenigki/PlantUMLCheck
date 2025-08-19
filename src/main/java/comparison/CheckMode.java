@@ -1,6 +1,6 @@
-package model;
+package comparison;
 
-public enum StrictnessLevel {
+public enum CheckMode {
     STRICT,   // exact match required
     RELAXED   // allows compatible substitutions
 }

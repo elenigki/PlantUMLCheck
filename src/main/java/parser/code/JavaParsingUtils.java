@@ -1,4 +1,4 @@
-package parser;
+package parser.code;
 
 import java.util.*;
 import java.util.regex.*;
