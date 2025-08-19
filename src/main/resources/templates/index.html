@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PlantUMLCheck – Home</title>
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="app-title">PlantUMLCheck</h1>
+      <p class="app-subtitle">Consistency checking between UML and Java code</p>
+    </header>
+
+    <main class="content">
+      <!-- tiny centered hero blurb -->
+      <section class="hero">
+        <p>
+          Start by adding your PlantUML script(s) and your Java source. You can
+          also continue with code only.
+        </p>
+      </section>
+
+      <div class="alert error" th:if="${error}" th:text="${error}"></div>
+
+      <form
+        class="upload-form"
+        th:action="@{/analyze}"
+        method="post"
+        enctype="multipart/form-data"
+      >
+        <section class="dropzones">
+          <!-- PlantUML box -->
+          <div class="card dropzone" id="puml-box">
+            <div class="card-head">
+              <div class="title-row">
+                <span class="step">Step 1</span>
+                <h2 class="card-title">PlantUML diagram script(s)</h2>
+              </div>
+              <span
+                class="info"
+                title="Optional. If empty, you can choose to proceed with Code-only."
+                >ⓘ</span
+              >
+            </div>
+            <p class="badge">
+              Accepted: folders or .puml, .plantuml, .iuml, .txt
+            </p>
+
+            <input type="hidden" id="codeOnly" name="codeOnly" value="false" />
+
+            <input
+              id="plantuml-input"
+              class="file-input"
+              type="file"
+              name="plantuml"
+              multiple
+              webkitdirectory
+              directory
+              accept=".puml,.plantuml,.iuml,.txt"
+            />
+
+            <label for="plantuml-input" class="btn choose-btn"
+              >Choose files / folder</label
+            >
+
+            <ul id="plantuml-list" class="file-list"></ul>
+          </div>
+
+          <!-- Source code box -->
+          <div class="card dropzone" id="source-box">
+            <div class="card-head">
+              <div class="title-row">
+                <span class="step required">Step 2</span>
+                <h2 class="card-title">Source code</h2>
+              </div>
+              <span
+                class="info"
+                title="Required. Pick a folder or multiple .java files."
+                >ⓘ</span
+              >
+            </div>
+            <p class="badge">Accepted: folders or .java files</p>
+
+            <input
+              id="source-input"
+              class="file-input"
+              type="file"
+              name="source"
+              multiple
+              webkitdirectory
+              directory
+              accept=".java"
+            />
+
+            <label for="source-input" class="btn choose-btn"
+              >Choose files / folder</label
+            >
+
+            <ul id="source-list" class="file-list"></ul>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button type="submit" class="btn primary" id="continue-btn">
+            Continue
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <!-- Modal (kept for later wiring) -->
+    <div id="code-only-modal" class="modal" hidden>
+      <div class="modal-content">
+        <h3 class="modal-title">No PlantUML scripts selected</h3>
+        <p>
+          Do you want to generate a PlantUML diagram based on source code only?
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="code-only-yes">
+            Yes, continue
+          </button>
+          <button type="button" class="btn" id="code-only-no">
+            No, go back
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/upload.js"></script>
+  </body>
+</html>
