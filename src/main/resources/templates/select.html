@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PlantUMLCheck – Selection</title>
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="app-title">Selection Preview</h1>
+      <p class="app-subtitle">
+        Pick the packages/classes you want to include before parsing
+      </p>
+    </header>
+
+    <main class="content">
+      <section class="hero">
+        <p>
+          Use <strong>Select all</strong> or tick whole packages. You can
+          fine-tune class by class.
+        </p>
+        <p id="js-status" class="badge">JS: not running</p>
+      </section>
+
+      <div class="alert error" th:if="${scanMap == null}">
+        Nothing to show yet. Go back to the <a th:href="@{/}">home page</a> and
+        upload source files.
+      </div>
+
+      <section
+        th:if="${scanMap != null}"
+        class="dropzones single"
+        style="gap: 1.25rem"
+      >
+        <div class="card">
+          <div class="card-head">
+            <div class="title-row">
+              <span class="step required">Choose</span>
+              <h2 class="card-title">Packages &amp; Classes</h2>
+            </div>
+            <label class="toggle" title="Select or unselect everything">
+              <input id="select-all" type="checkbox" />
+              <span class="slider"></span>
+              <span class="label">Select all</span>
+            </label>
+          </div>
+
+          <form method="post" th:action="@{/select}">
+            <ul
+              class="file-list"
+              style="
+                list-style: none;
+                padding-left: 0;
+                max-height: 360px;
+                overflow: auto;
+              "
+            >
+              <li
+                th:each="e : ${scanMap}"
+                class="pkg-row"
+                th:attr="data-pkg=${e.key}"
+              >
+                <div
+                  class="pkg-head"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin: 0.25rem 0;
+                  "
+                >
+                  <input
+                    class="pkg-checkbox"
+                    type="checkbox"
+                    th:attr="data-pkg=${e.key}"
+                  />
+                  <strong th:text="${e.key == '' ? '(default package)' : e.key}"
+                    >com.example</strong
+                  >
+                  <span
+                    class="badge"
+                    th:text="${#lists.size(e.value)} + ' classes'"
+                    >0 classes</span
+                  >
+                </div>
+
+                <ul
+                  class="cls-list"
+                  style="
+                    margin: 0.25rem 0 0.5rem 1.6rem;
+                    padding-left: 0;
+                    list-style: none;
+                  "
+                >
+                  <li th:each="cls : ${e.value}" style="margin: 0.15rem 0">
+                    <label
+                      style="display: flex; align-items: center; gap: 0.5rem"
+                    >
+                      <input
+                        class="cls-checkbox"
+                        type="checkbox"
+                        name="cls"
+                        th:value="${(e.key == '' ? '' : e.key + '.') + cls}"
+                      />
+                      <span th:text="${cls}">MyClass</span>
+                    </label>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+
+            <div class="actions" style="gap: 0.5rem">
+              <a th:href="@{/}" class="btn">← Back</a>
+              <button class="btn primary" type="submit">
+                Continue to Parsing
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <!-- Inline JS so it always executes (no static-path issues) -->
+    <script>
+      (() => {
+        const jsStatus = document.getElementById("js-status");
+        if (jsStatus) jsStatus.textContent = "JS: running ✅";
+
+        const $ = (sel, ctx) => (ctx || document).querySelector(sel);
+        const $$ = (sel, ctx) =>
+          Array.from((ctx || document).querySelectorAll(sel));
+
+        const selectAll = $("#select-all");
+        const pkgRows = $$(".pkg-row");
+
+        function setChecked(cb, v) {
+          if (!cb) return;
+          cb.indeterminate = false;
+          cb.checked = v;
+        }
+
+        function updatePkgStateForRow(row) {
+          const pkgCb = row.querySelector(".pkg-checkbox");
+          const classCbs = $$(".cls-checkbox", row);
+          if (!pkgCb || classCbs.length === 0) return;
+          const checked = classCbs.filter((c) => c.checked).length;
+          if (checked === 0) {
+            pkgCb.indeterminate = false;
+            pkgCb.checked = false;
+          } else if (checked === classCbs.length) {
+            pkgCb.indeterminate = false;
+            pkgCb.checked = true;
+          } else {
+            pkgCb.indeterminate = true;
+            pkgCb.checked = false;
+          }
+        }
+
+        function updateSelectAllState() {
+          const allClassCbs = $$(".cls-checkbox");
+          if (!selectAll || allClassCbs.length === 0) return;
+          const checked = allClassCbs.filter((c) => c.checked).length;
+          if (checked === 0) setChecked(selectAll, false);
+          else if (checked === allClassCbs.length) setChecked(selectAll, true);
+          else {
+            selectAll.indeterminate = true;
+            selectAll.checked = false;
+          }
+        }
+
+        // Package checkbox toggles all its classes
+        pkgRows.forEach((row) => {
+          const pkgCb = row.querySelector(".pkg-checkbox");
+          const classCbs = $$(".cls-checkbox", row);
+
+          if (pkgCb) {
+            pkgCb.addEventListener("change", () => {
+              classCbs.forEach((c) => setChecked(c, pkgCb.checked));
+              updatePkgStateForRow(row);
+              updateSelectAllState();
+            });
+          }
+
+          classCbs.forEach((c) => {
+            c.addEventListener("change", () => {
+              updatePkgStateForRow(row);
+              updateSelectAllState();
+            });
+          });
+
+          // Initialize per-package state
+          updatePkgStateForRow(row);
+        });
+
+        // Select-all toggles every package + every class
+        if (selectAll) {
+          selectAll.addEventListener("change", () => {
+            const allClassCbs = $$(".cls-checkbox");
+            const allPkgCbs = $$(".pkg-checkbox");
+            allClassCbs.forEach((c) => setChecked(c, selectAll.checked));
+            allPkgCbs.forEach((p) => setChecked(p, selectAll.checked));
+            selectAll.indeterminate = false;
+          });
+        }
+
+        // Initialize global state
+        updateSelectAllState();
+      })();
+    </script>
+  </body>
+</html>
