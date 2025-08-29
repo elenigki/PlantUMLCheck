@@ -1,10 +1,13 @@
-// upload.js — small and simple
+// upload.js — highlights, lists, and code-only handling with refresh
 
 (() => {
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
-  // elements
+  const params = new URLSearchParams(location.search);
+  const codeOnlyParam = params.get("codeOnly") === "true";
+
+  // elements (some may be absent if codeOnly=true)
   const plantumlInput = $("#plantuml-input");
   const sourceInput = $("#source-input");
   const plantumlList = $("#plantuml-list");
@@ -12,12 +15,23 @@
   const form = $(".upload-form");
   const codeOnlyField = $("#codeOnly");
 
-  const modal = $("#code-only-modal");
-  const yesBtn = $("#code-only-yes");
-  const noBtn = $("#code-only-no");
+  // toggle switch (controls refresh)
+  const codeOnlyToggle = $("#code-only-toggle");
+  if (codeOnlyToggle) {
+    codeOnlyToggle.addEventListener("change", () => {
+      const newVal = codeOnlyToggle.checked ? "true" : "false";
+      const p = new URLSearchParams(location.search);
+      p.set("codeOnly", newVal);
+      location.search = p.toString(); // refresh to re-render with/without Step 2
+    });
+  }
+
+  // keep hidden field in sync with query
+  if (codeOnlyField) codeOnlyField.value = String(codeOnlyParam);
 
   // render file names to a UL
   function renderList(input, list) {
+    if (!input || !list) return;
     list.innerHTML = "";
     const files = Array.from(input.files || []);
     files.forEach((f) => {
@@ -27,13 +41,15 @@
     });
   }
 
-  // initial change listeners
-  plantumlInput.addEventListener("change", () =>
-    renderList(plantumlInput, plantumlList)
-  );
-  sourceInput.addEventListener("change", () =>
-    renderList(sourceInput, sourceList)
-  );
+  // change listeners
+  if (plantumlInput)
+    plantumlInput.addEventListener("change", () =>
+      renderList(plantumlInput, plantumlList)
+    );
+  if (sourceInput)
+    sourceInput.addEventListener("change", () =>
+      renderList(sourceInput, sourceList)
+    );
 
   // make dropzones nicer
   $$(".dropzone").forEach((zone) => {
@@ -46,10 +62,11 @@
       e.preventDefault();
       zone.classList.remove("drag");
 
-      const targetInput = zone.id === "puml-box" ? plantumlInput : sourceInput;
-      const targetList = zone.id === "puml-box" ? plantumlList : sourceList;
+      const isPuml = zone.id === "puml-box";
+      const targetInput = isPuml ? plantumlInput : sourceInput;
+      const targetList = isPuml ? plantumlList : sourceList;
+      if (!targetInput) return;
 
-      // collect dropped files (directories may not come through here; folder picker works better)
       const dt = new DataTransfer();
       Array.from(e.dataTransfer.files || []).forEach((f) => dt.items.add(f));
       targetInput.files = dt.files;
@@ -58,39 +75,44 @@
     });
   });
 
-  // modal helpers
-  const openModal = () => {
-    modal.hidden = false;
-  };
-  const closeModal = () => {
-    modal.hidden = true;
-  };
-
-  yesBtn.addEventListener("click", () => {
-    codeOnlyField.value = "true";
-    closeModal();
-    form.submit();
-  });
-  noBtn.addEventListener("click", () => {
-    codeOnlyField.value = "false";
-    closeModal();
-  });
-
-  // intercept submit: require source; ask about code-only if PlantUML is empty
+  // intercept submit:
+  // - Source required always
+  // - If NOT code-only and PlantUML empty, ask via modal
   form.addEventListener("submit", (e) => {
-    const plantumlEmpty = plantumlInput.files.length === 0;
-    const sourceEmpty = sourceInput.files.length === 0;
-
+    const sourceEmpty = !sourceInput || sourceInput.files.length === 0;
     if (sourceEmpty) {
-      // let backend also validate; but we give a quick, friendly notice
       alert("Please add your source code (folder or .java files).");
       e.preventDefault();
       return;
     }
 
-    if (plantumlEmpty) {
-      e.preventDefault();
-      openModal(); // ask the user about Code-only
+    if (!codeOnlyParam) {
+      const plantumlEmpty = !plantumlInput || plantumlInput.files.length === 0;
+      if (plantumlEmpty) {
+        e.preventDefault();
+        const modal = $("#code-only-modal");
+        const yes = $("#code-only-yes");
+        const no = $("#code-only-no");
+        if (modal && yes && no) {
+          modal.hidden = false;
+          yes.onclick = () => {
+            codeOnlyField.value = "true";
+            modal.hidden = true;
+            form.submit();
+          };
+          no.onclick = () => {
+            codeOnlyField.value = "false";
+            modal.hidden = true;
+          };
+        } else {
+          if (
+            confirm("No PlantUML scripts selected. Continue with code only?")
+          ) {
+            codeOnlyField.value = "true";
+            form.submit();
+          }
+        }
+      }
     }
   });
 })();

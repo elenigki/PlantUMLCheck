@@ -12,13 +12,29 @@
       <p class="app-subtitle">Consistency checking between UML and Java code</p>
     </header>
 
-    <main class="content">
-      <!-- tiny centered hero blurb -->
+    <!-- codeOnly is driven by ?codeOnly=true|false -->
+    <main
+      class="content"
+      th:with="codeOnly=${param.codeOnly != null ? (param.codeOnly[0] == 'true') : false}"
+    >
       <section class="hero">
         <p>
-          Start by adding your PlantUML script(s) and your Java source. You can
-          also continue with code only.
+          Start with your Java source. You can optionally add PlantUML scripts —
+          or proceed with code only.
         </p>
+      </section>
+
+      <!-- Code-only toggle -->
+      <section class="controls">
+        <label class="toggle">
+          <input
+            id="code-only-toggle"
+            type="checkbox"
+            th:checked="${codeOnly}"
+          />
+          <span class="slider"></span>
+          <span class="label">Proceed with code only</span>
+        </label>
       </section>
 
       <div class="alert error" th:if="${error}" th:text="${error}"></div>
@@ -28,50 +44,25 @@
         th:action="@{/analyze}"
         method="post"
         enctype="multipart/form-data"
+        th:attr="data-codeonly=${codeOnly}"
       >
-        <section class="dropzones">
-          <!-- PlantUML box -->
-          <div class="card dropzone" id="puml-box">
-            <div class="card-head">
-              <div class="title-row">
-                <span class="step">Step 1</span>
-                <h2 class="card-title">PlantUML diagram script(s)</h2>
-              </div>
-              <span
-                class="info"
-                title="Optional. If empty, you can choose to proceed with Code-only."
-                >ⓘ</span
-              >
-            </div>
-            <p class="badge">
-              Accepted: folders or .puml, .plantuml, .iuml, .txt
-            </p>
+        <input
+          type="hidden"
+          id="codeOnly"
+          name="codeOnly"
+          th:value="${codeOnly}"
+        />
 
-            <input type="hidden" id="codeOnly" name="codeOnly" value="false" />
-
-            <input
-              id="plantuml-input"
-              class="file-input"
-              type="file"
-              name="plantuml"
-              multiple
-              webkitdirectory
-              directory
-              accept=".puml,.plantuml,.iuml,.txt"
-            />
-
-            <label for="plantuml-input" class="btn choose-btn"
-              >Choose files / folder</label
-            >
-
-            <ul id="plantuml-list" class="file-list"></ul>
-          </div>
-
-          <!-- Source code box -->
+        <!-- When codeOnly=true add 'single' class to center -->
+        <section
+          class="dropzones"
+          th:classappend="${codeOnly} ? ' single' : ''"
+        >
+          <!-- STEP 1: Source -->
           <div class="card dropzone" id="source-box">
             <div class="card-head">
               <div class="title-row">
-                <span class="step required">Step 2</span>
+                <span class="step required">Step 1</span>
                 <h2 class="card-title">Source code</h2>
               </div>
               <span
@@ -99,6 +90,41 @@
 
             <ul id="source-list" class="file-list"></ul>
           </div>
+
+          <!-- STEP 2: PlantUML (hidden when codeOnly=true) -->
+          <div class="card dropzone" id="puml-box" th:if="${!codeOnly}">
+            <div class="card-head">
+              <div class="title-row">
+                <span class="step">Step 2</span>
+                <h2 class="card-title">PlantUML diagram script(s)</h2>
+              </div>
+              <span
+                class="info"
+                title="Optional. If empty, you can choose to proceed with Code-only."
+                >ⓘ</span
+              >
+            </div>
+            <p class="badge">
+              Accepted: folders or .puml, .plantuml, .iuml, .txt
+            </p>
+
+            <input
+              id="plantuml-input"
+              class="file-input"
+              type="file"
+              name="plantuml"
+              multiple
+              webkitdirectory
+              directory
+              accept=".puml,.plantuml,.iuml,.txt"
+            />
+
+            <label for="plantuml-input" class="btn choose-btn"
+              >Choose files / folder</label
+            >
+
+            <ul id="plantuml-list" class="file-list"></ul>
+          </div>
         </section>
 
         <div class="actions">
@@ -109,7 +135,7 @@
       </form>
     </main>
 
-    <!-- Modal (kept for later wiring) -->
+    <!-- Modal (used when NOT code-only and PlantUML is empty at submit) -->
     <div id="code-only-modal" class="modal" hidden>
       <div class="modal-content">
         <h3 class="modal-title">No PlantUML scripts selected</h3>
