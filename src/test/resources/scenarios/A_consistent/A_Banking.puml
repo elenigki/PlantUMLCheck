@@ -1,0 +1,37 @@
+@startuml
+skinparam classAttributeIconSize 0
+package "a" {
+  interface Auditable {
+    +String audit()
+  }
+
+  class Account {
+    -int id
+    -double balance
+    +Account(int id)
+    +void deposit(double amount)
+    +boolean withdraw(double amount)
+    +int getId()
+    +double getBalance()
+  }
+
+  class SavingsAccount extends Account {
+    -double interestRate
+    +SavingsAccount(int id, double interestRate)
+    +void addMonthlyInterest()
+  }
+
+  class AccountHolder {
+    -String name
+    -List<Account> accounts
+    +AccountHolder(String name)
+    +void addAccount(Account account)
+    +String getName()
+    +List<Account> getAccounts()
+  }
+
+  Auditable <|.. Account
+  AccountHolder "1" *-- "1..*" Account : owns >
+  SavingsAccount --|> Account
+}
+@enduml

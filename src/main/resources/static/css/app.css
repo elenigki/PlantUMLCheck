@@ -1,330 +1,333 @@
-/* layout + typography */
+/* Ensure hidden works everywhere if used */
+[hidden] {
+    display: none !important
+}
+
+/* ========= Base ========= */
 :root {
-    --gap: 1rem;
-    --radius: 14px;
-    --shadow: 0 6px 20px rgba(0, 0, 0, .06);
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
 }
 
 * {
-    box-sizing: border-box;
+    box-sizing: border-box
+}
+
+html,
+body {
+    height: 100%
 }
 
 body {
     margin: 0;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    color: #1f2328;
-    /* soft patterned background */
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--ink);
     background:
-        radial-gradient(60rem 60rem at -10% -20%, #eef2ff 0%, transparent 55%),
-        radial-gradient(60rem 60rem at 110% 120%, #ecfeff 0%, transparent 55%),
-        #fafafa;
+        radial-gradient(1200px 700px at -10% -10%, #eef2ff 0, transparent 50%),
+        radial-gradient(1200px 700px at 110% 110%, #ecfeff 0, transparent 50%),
+        var(--bg);
 }
 
 .app-header {
-    padding: 2rem 1.25rem 1rem;
-    text-align: center;
+    padding: 1.25rem 1rem .5rem;
+    text-align: left
 }
 
 .app-title {
     margin: 0;
-    font-size: clamp(1.6rem, 2.5vw, 2.1rem);
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: .2px
 }
 
 .app-subtitle {
     margin: .25rem 0 0;
-    color: #6b7280;
+    color: var(--muted)
 }
 
-/* center content vertically on larger screens */
 .content {
-    padding: 0 1.25rem 2rem;
-    max-width: 1100px;
+    max-width: 1120px;
     margin: 0 auto;
-    min-height: calc(100vh - 170px);
-    display: grid;
-    align-content: start;
-    gap: 1rem;
+    padding: 1rem
 }
 
-@media (min-width: 1000px) {
-    .content {
-        align-content: center;
-    }
+.alert.error {
+    background: #fee2e2;
+    color: #7f1d1d;
+    border: 1px solid #fecaca;
+    padding: .75rem 1rem;
+    border-radius: 10px
 }
 
-/* tiny hero blurb */
-.hero {
-    text-align: center;
-    color: #4b5563;
-    margin-bottom: .25rem;
+/* ========= Hero / toggle ========= */
+.hero.inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem 0 1rem
 }
 
-.hero p {
-    margin: 0 auto;
-    max-width: 700px;
+.hero.inline h2 {
+    margin: .25rem 0;
+    text-align: center
 }
 
-/* grid for the boxes */
+.hero.inline p {
+    margin: 0;
+    text-align: center
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    cursor: pointer;
+    user-select: none
+}
+
+.toggle input {
+    display: none
+}
+
+.toggle .slider {
+    width: 42px;
+    height: 24px;
+    position: relative;
+    border-radius: 999px;
+    background: #cbd5e1;
+    display: inline-block;
+    transition: background .2s
+}
+
+.toggle .slider::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+    transition: transform .2s
+}
+
+.toggle input:checked+.slider {
+    background: #34d399
+}
+
+.toggle input:checked+.slider::after {
+    transform: translateX(18px)
+}
+
+.toggle .label {
+    color: var(--muted);
+    font-weight: 600
+}
+
+/* ========= Layout / cards ========= */
 .dropzones {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--gap);
-    align-items: stretch;
+    gap: 1.25rem;
+    grid-template-columns: minmax(520px, 1fr) minmax(340px, 560px);
+    align-items: start
 }
 
-@media (max-width: 900px) {
-    .dropzones {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* when only one card (codeOnly=true), center it nicely */
 .dropzones.single {
-    max-width: 560px;
-    margin: 0 auto;
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(360px, 860px);
+    justify-content: center
 }
 
-/* card + dropzone */
 .card {
-    background: #fff;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+    background: var(--card);
+    border-radius: 12px;
     padding: 1rem;
-    transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
-    border: 1px solid rgba(99, 102, 241, .06);
-}
-
-.card:hover {
-    box-shadow: 0 10px 28px rgba(99, 102, 241, .25);
-    transform: translateY(-2px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .08)
 }
 
 .card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .5rem;
+    gap: .75rem;
+    margin-bottom: .25rem
 }
 
 .title-row {
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: .5rem
 }
 
 .card-title {
-    margin: 0;
-    font-size: 1.1rem;
+    margin: 0
+}
+
+#puml-box {
+    max-width: 560px;
+    justify-self: start
+}
+
+/* keep Step 2 compact */
+
+/* ========= Badges & steps ========= */
+.badge {
+    display: inline-block;
+    padding: .25rem .5rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: .8rem;
+    font-weight: 600
 }
 
 .step {
     display: inline-block;
-    font-size: .75rem;
-    padding: .15rem .45rem;
-    border-radius: 999px;
-    background: #eef2ff;
-    color: #3730a3;
-    border: 1px solid #e0e7ff;
+    padding: .25rem .5rem;
+    border-radius: 6px;
+    font-size: .85rem;
+    font-weight: 700;
+    background: #e0e7ff;
+    color: #4338ca
 }
 
 .step.required {
-    background: #dcfce7;
-    color: #065f46;
-    border-color: #bbf7d0;
+    background: #d1fae5;
+    color: #065f46
 }
 
-.badge {
-    display: inline-block;
-    background: #f3f4f6;
-    color: #6b7280;
-    padding: .15rem .5rem;
-    border-radius: 999px;
-    font-size: .8rem;
-    margin: .35rem 0 .6rem;
+.step.optional {
+    background: #fce7f3;
+    color: #9d174d;
+    border: 1px solid #fbcfe8
 }
 
-.dropzone {
-    border: 2px dashed #e5e7eb;
-}
+/* baby pink */
 
-.dropzone.drag {
-    border-color: #6366f1;
-    background: #f9f9ff;
-}
-
-/* info icon */
-.info {
-    font-size: .95rem;
-    color: #9aa0a6;
-    cursor: help;
-    user-select: none;
-}
-
-.info:hover {
-    color: #6b7280;
-}
-
-/* hide native file input (we use label buttons) */
-.file-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-/* file list */
-.file-list {
-    margin: .6rem 0 0;
-    padding-left: 1.1rem;
-    max-height: 180px;
-    overflow: auto;
-}
-
-.file-list li {
-    padding: .1rem 0;
-    color: #374151;
-    list-style: disc;
-}
-
-/* buttons with wow factor */
+/* ========= Buttons ========= */
 .btn {
     display: inline-block;
     border: none;
     padding: .65rem 1rem;
     border-radius: 10px;
     cursor: pointer;
-    font: 500 0.95rem/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font: inherit;
     background: linear-gradient(135deg, #6366f1, #4338ca);
     color: #fff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
-    transition: transform .15s ease, box-shadow .15s ease;
+    transition: transform .15s, box-shadow .15s
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
-}
-
-.btn:active {
-    transform: translateY(0);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25)
 }
 
 .btn.primary {
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, #10b981, #059669)
 }
 
 .btn.primary:hover {
     transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .25)
 }
 
-/* actions row */
+.btn.secondary {
+    background: linear-gradient(135deg, #9bb0ff, #7c8cf7)
+}
+
+.choose-btn {
+    margin-top: .5rem
+}
+
 .actions {
-    margin-top: 1rem;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: .5rem;
+    margin-top: 1rem
 }
 
-/* alerts */
-.alert.error {
-    margin: 0 auto 1rem;
-    max-width: 800px;
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
-    padding: .75rem .9rem;
-    border-radius: 10px;
+.actions.center {
+    justify-content: center
 }
 
-/* controls row (top toggle) */
-.controls {
+/* ========= Inputs / lists ========= */
+.file-input {
+    display: none
+}
+
+/* keep only our single pretty button */
+.file-list {
+    list-style: none;
+    margin: .5rem 0;
+    padding: 0
+}
+
+.file-list li {
     display: flex;
-    justify-content: center;
-    margin: .25rem 0 .5rem;
+    justify-content: space-between;
+    align-items: center;
+    margin: .25rem 0
 }
 
-/* toggle switch */
-.toggle {
+.file-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
+}
+
+.muted {
+    color: var(--muted);
+    font-size: .9rem
+}
+
+.muted.center {
+    text-align: center;
+    opacity: .85
+}
+
+/* small red minus */
+.icon-btn {
     display: inline-flex;
     align-items: center;
-    gap: .6rem;
-    cursor: pointer;
-    user-select: none;
-}
-
-.toggle .label {
-    color: #4b5563;
-}
-
-.toggle input {
-    display: none;
-}
-
-.toggle .slider {
-    position: relative;
-    width: 46px;
-    height: 26px;
-    background: #e5e7eb;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    font-size: 13px;
     border-radius: 999px;
-    transition: background .15s ease;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06);
+    border: none;
+    cursor: pointer;
+    background: #dc2626;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .16);
+    transition: transform .12s, box-shadow .12s, opacity .12s
 }
 
-.toggle .slider::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    background: #fff;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
-    transition: transform .15s ease;
+.icon-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .22)
 }
 
-.toggle input:checked+.slider {
-    background: #10b981;
+.icon-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .16);
+    opacity: .9
 }
 
-.toggle input:checked+.slider::after {
-    transform: translateX(20px);
+/* Drag visuals per box */
+.drop-hint {
+    margin: .35rem 0 .25rem;
+    color: #94a3b8;
+    font-size: .9rem
 }
 
-/* modal */
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .35);
-    display: grid;
-    place-items: center;
+.dropzone {
+    transition: box-shadow .15s, transform .1s
 }
 
-.modal[hidden] {
-    display: none;
-}
-
-.modal-content {
-    background: #fff;
-    border-radius: var(--radius);
-    padding: 1rem;
-    width: min(520px, 92vw);
-    box-shadow: var(--shadow);
-}
-
-.modal-title {
-    margin: 0 0 .5rem;
-}
-
-.modal-actions {
-    display: flex;
-    gap: .5rem;
-    justify-content: flex-end;
-    margin-top: .75rem;
+.dropzone.drag-over {
+    outline: 2px dashed #6366f1;
+    outline-offset: 6px;
+    box-shadow: 0 10px 24px rgba(99, 102, 241, .2)
 }
