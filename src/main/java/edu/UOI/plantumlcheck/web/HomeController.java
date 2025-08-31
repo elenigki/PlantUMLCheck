@@ -4,8 +4,6 @@ import edu.UOI.plantumlcheck.service.JavaScanService;
 import edu.UOI.plantumlcheck.service.JavaScanService.Workspace;
 import edu.UOI.plantumlcheck.web.view.SelectionSummary;
 import jakarta.servlet.http.HttpSession;
-import parser.code.ScannedJavaInfo;
-
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,6 +54,7 @@ public class HomeController {
             return "index";
         }
 
+        // Filenames for UI
         List<String> plantumlNames = (plantuml == null) ? List.of() :
                 Arrays.stream(plantuml)
                         .filter(f -> f != null && !f.isEmpty())
@@ -70,25 +69,24 @@ public class HomeController {
 
         SelectionSummary summary = new SelectionSummary(plantumlNames, sourceNames, codeOnly);
 
-        // Save source files to a temp workspace
         try {
-        	Workspace ws = scanService.saveSourceToWorkspace(source);
-        	String root = ws.root().toString();
+            // Save source files to workspace + quick scan
+            Workspace ws = scanService.saveSourceToWorkspace(source);
+            String root = ws.root().toString();
+            Map<String, List<String>> scanMap = scanService.buildPackageMap(ws.root());
 
-        	// Build the package->classes map (never null; may be empty)
-        	Map<String, List<String>> scanMap = scanService.buildPackageMap(ws.root());
+            // Flash + Session (so /select works after redirect or refresh)
+            redirect.addFlashAttribute("selectionSummary", summary);
+            redirect.addFlashAttribute("workspaceRoot", root);
+            redirect.addFlashAttribute("scanMap", scanMap);
+            redirect.addFlashAttribute("plantumlNames", plantumlNames);
+            redirect.addFlashAttribute("codeOnly", codeOnly);
 
-        	// Flash + Session (so /select will have everything)
-        	redirect.addFlashAttribute("selectionSummary", summary);
-        	redirect.addFlashAttribute("workspaceRoot", root);
-        	redirect.addFlashAttribute("scanMap", scanMap);
-
-        	session.setAttribute("selectionSummary", summary);
-        	session.setAttribute("workspaceRoot", root);
-        	session.setAttribute("scanMap", scanMap);
-
-            // (optional) avoid storing List<Path> directly in session to keep it simple
-            // session.setAttribute("workspaceFiles", ws.savedFiles().stream().map(Path::toString).toList());
+            session.setAttribute("selectionSummary", summary);
+            session.setAttribute("workspaceRoot", root);
+            session.setAttribute("scanMap", scanMap);
+            session.setAttribute("plantumlNames", plantumlNames);
+            session.setAttribute("codeOnly", codeOnly);
 
         } catch (IOException e) {
             model.addAttribute("error", "Failed to save source files: " + e.getMessage());
@@ -100,20 +98,23 @@ public class HomeController {
 
     @GetMapping("/select")
     public String selectPreview(Model model, HttpSession session) {
-        // If Flash was lost, fall back to session
-        if (model.getAttribute("selectionSummary") == null) {
-            Object fromSession = session.getAttribute("selectionSummary");
-            if (fromSession != null) model.addAttribute("selectionSummary", fromSession);
-        }
-        if (model.getAttribute("workspaceRoot") == null) {
-            Object root = session.getAttribute("workspaceRoot");
-            if (root != null) model.addAttribute("workspaceRoot", root);
-        }
-        if (model.getAttribute("scanMap") == null) {
-            Object sm = session.getAttribute("scanMap");
-            if (sm != null) model.addAttribute("scanMap", sm);
-        }
+        // Rehydrate core attrs for refresh/direct access
+        copyFromSessionIfMissing("selectionSummary", model, session);
+        copyFromSessionIfMissing("workspaceRoot", model, session);
+        copyFromSessionIfMissing("scanMap", model, session);
+
+        // Plain, template-safe attributes:
+        copyFromSessionIfMissing("plantumlNames", model, session);
+        copyFromSessionIfMissing("codeOnly", model, session);
 
         return "select";
+    }
+
+    /** Convenience: if the model lacks 'key', copy it from session when present. */
+    private static void copyFromSessionIfMissing(String key, Model model, HttpSession session) {
+        if (model.getAttribute(key) == null) {
+            Object v = session.getAttribute(key);
+            if (v != null) model.addAttribute(key, v);
+        }
     }
 }

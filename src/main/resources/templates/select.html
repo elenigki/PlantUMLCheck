@@ -5,208 +5,248 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PlantUMLCheck – Selection</title>
     <link rel="stylesheet" href="/css/app.css" />
+    <style>
+      /* Page layout */
+      .wrap {
+        max-width: 1180px;
+        margin: 36px auto;
+        padding: 0 16px;
+      }
+      .page-title {
+        text-align: center;
+      }
+      .subtitle {
+        text-align: center;
+        color: var(--muted, #6b7280);
+        margin: 6px 0 22px;
+      }
+
+      /* Grid */
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+        align-items: start;
+      }
+      @media (min-width: 980px) {
+        .layout {
+          grid-template-columns: 1.25fr 0.75fr;
+        }
+      }
+
+      /* Cards */
+      .card {
+        background: var(--card, #fff);
+        border: 1px solid var(--border, #e7e9f0);
+        border-radius: 16px;
+      }
+      .card-body {
+        padding: 18px;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px 18px 0;
+      }
+      .card-title {
+        margin: 0;
+        text-align: center;
+      }
+      .step {
+        font-size: 0.85rem;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #eef2ff;
+        color: #3730a3;
+      }
+
+      /* Toolbar & actions */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 16px;
+        margin: 8px 0 12px;
+        padding: 0 18px;
+      }
+      .selectall {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 0 18px 18px;
+      }
+
+      /* Package list */
+      .pkg {
+        border: 1px solid var(--border, #e7e9f0);
+        border-radius: 14px;
+        padding: 12px;
+        margin: 10px 0;
+      }
+      .pkg-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pkg-name {
+        font-weight: 700;
+      }
+      .pkg-classes {
+        margin-top: 8px;
+        padding-left: 30px;
+      }
+      .cls-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        display: inline-block;
+        background: #5b7cfa;
+      }
+      .file-name {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .count-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #f2f4f8;
+        border: 1px solid #e4e7ef;
+      }
+
+      /* PlantUML card */
+      .puml-head .step {
+        background: #ffe6f2;
+        color: #a61e4d;
+        border-color: #ffd6e7;
+      }
+      .puml-list {
+        margin-top: 10px;
+        border: 1px dashed var(--border, #e7e9f0);
+        border-radius: 12px;
+        padding: 8px 10px;
+      }
+      .puml-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 2px;
+      }
+      .puml-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        display: inline-block;
+        background: #10b981;
+      }
+    </style>
   </head>
   <body>
     <header class="app-header">
-      <h1 class="app-title">Selection Preview</h1>
-      <p class="app-subtitle">
+      <h1 class="app-title page-title">Selection Preview</h1>
+      <p class="app-subtitle subtitle">
         Pick the packages/classes you want to include before parsing
       </p>
     </header>
 
-    <main class="content">
-      <section class="hero">
-        <p>
-          Use <strong>Select all</strong> or tick whole packages. You can
-          fine-tune class by class.
-        </p>
-        <p id="js-status" class="badge">JS: not running</p>
-      </section>
-
-      <div class="alert error" th:if="${scanMap == null}">
-        Nothing to show yet. Go back to the <a th:href="@{/}">home page</a> and
-        upload source files.
-      </div>
-
-      <section
-        th:if="${scanMap != null}"
-        class="dropzones single"
-        style="gap: 1.25rem"
+    <main class="wrap">
+      <div
+        class="layout"
+        th:with="uml=${plantumlNames}, isCodeOnly=${codeOnly}"
       >
-        <div class="card">
+        <!-- LEFT: Packages & Classes (form card) -->
+        <form method="post" th:action="@{/select/confirm}" class="card">
+          <input type="hidden" name="codeOnly" th:value="${codeOnly}" />
+
           <div class="card-head">
-            <div class="title-row">
-              <span class="step required">Choose</span>
-              <h2 class="card-title">Packages &amp; Classes</h2>
-            </div>
-            <label class="toggle" title="Select or unselect everything">
-              <input id="select-all" type="checkbox" />
-              <span class="slider"></span>
-              <span class="label">Select all</span>
+            <span class="step">Choose</span>
+            <h2 class="card-title">Packages &amp; Classes</h2>
+          </div>
+
+          <div class="toolbar">
+            <label class="selectall">
+              <input id="selectAll" type="checkbox" />
+              <strong>Select all</strong>
             </label>
           </div>
 
-          <form method="post" th:action="@{/select}">
-            <ul
-              class="file-list"
-              style="
-                list-style: none;
-                padding-left: 0;
-                max-height: 360px;
-                overflow: auto;
-              "
-            >
-              <li
-                th:each="e : ${scanMap}"
-                class="pkg-row"
-                th:attr="data-pkg=${e.key}"
-              >
-                <div
-                  class="pkg-head"
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    margin: 0.25rem 0;
-                  "
+          <div class="card-body">
+            <div th:each="e : ${scanMap}" class="pkg">
+              <div class="pkg-head">
+                <input class="pkg-checkbox" type="checkbox" />
+                <span
+                  class="pkg-name"
+                  th:text="${e.key == '' ? '(default package)' : e.key}"
+                  >a</span
                 >
+                <span
+                  class="count-badge"
+                  th:text="${#lists.size(e.value)} + ' classes'"
+                  >0 classes</span
+                >
+              </div>
+              <div class="pkg-classes">
+                <label class="cls-row" th:each="cls : ${e.value}">
                   <input
-                    class="pkg-checkbox"
+                    class="cls-checkbox"
                     type="checkbox"
-                    th:attr="data-pkg=${e.key}"
+                    name="cls"
+                    th:value="${(e.key == '' ? '' : e.key + '.') + cls}"
                   />
-                  <strong th:text="${e.key == '' ? '(default package)' : e.key}"
-                    >com.example</strong
+                  <span class="dot" aria-hidden="true"></span>
+                  <span class="file-name" th:text="${cls + '.java'}"
+                    >ClassName.java</span
                   >
-                  <span
-                    class="badge"
-                    th:text="${#lists.size(e.value)} + ' classes'"
-                    >0 classes</span
-                  >
-                </div>
-
-                <ul
-                  class="cls-list"
-                  style="
-                    margin: 0.25rem 0 0.5rem 1.6rem;
-                    padding-left: 0;
-                    list-style: none;
-                  "
-                >
-                  <li th:each="cls : ${e.value}" style="margin: 0.15rem 0">
-                    <label
-                      style="display: flex; align-items: center; gap: 0.5rem"
-                    >
-                      <input
-                        class="cls-checkbox"
-                        type="checkbox"
-                        name="cls"
-                        th:value="${(e.key == '' ? '' : e.key + '.') + cls}"
-                      />
-                      <span th:text="${cls}">MyClass</span>
-                    </label>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-
-            <div class="actions" style="gap: 0.5rem">
-              <a th:href="@{/}" class="btn">← Back</a>
-              <button class="btn primary" type="submit">
-                Continue to Parsing
-              </button>
+                </label>
+              </div>
             </div>
-          </form>
-        </div>
-      </section>
+          </div>
+
+          <div class="actions">
+            <a class="btn" th:href="@{/}">← Back</a>
+            <button class="btn primary" type="submit">
+              Continue to Parsing
+            </button>
+          </div>
+        </form>
+
+        <!-- RIGHT: PlantUML (separate card; outside the form) -->
+        <aside
+          class="card"
+          th:if="${uml != null and !uml.isEmpty() and !isCodeOnly}"
+        >
+          <div class="card-head puml-head">
+            <span class="step">PlantUML</span>
+            <h3 class="card-title">Scripts</h3>
+            <span class="count-badge" th:text="${#lists.size(uml)} + ' file(s)'"
+              >0 file(s)</span
+            >
+          </div>
+          <div class="card-body">
+            <div class="puml-list">
+              <div class="puml-item" th:each="n : ${uml}">
+                <span class="puml-dot" aria-hidden="true"></span>
+                <span class="file-name" th:text="${n}">diagram.puml</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </main>
 
-    <!-- Inline JS so it always executes (no static-path issues) -->
-    <script>
-      (() => {
-        const jsStatus = document.getElementById("js-status");
-        if (jsStatus) jsStatus.textContent = "JS: running ✅";
-
-        const $ = (sel, ctx) => (ctx || document).querySelector(sel);
-        const $$ = (sel, ctx) =>
-          Array.from((ctx || document).querySelectorAll(sel));
-
-        const selectAll = $("#select-all");
-        const pkgRows = $$(".pkg-row");
-
-        function setChecked(cb, v) {
-          if (!cb) return;
-          cb.indeterminate = false;
-          cb.checked = v;
-        }
-
-        function updatePkgStateForRow(row) {
-          const pkgCb = row.querySelector(".pkg-checkbox");
-          const classCbs = $$(".cls-checkbox", row);
-          if (!pkgCb || classCbs.length === 0) return;
-          const checked = classCbs.filter((c) => c.checked).length;
-          if (checked === 0) {
-            pkgCb.indeterminate = false;
-            pkgCb.checked = false;
-          } else if (checked === classCbs.length) {
-            pkgCb.indeterminate = false;
-            pkgCb.checked = true;
-          } else {
-            pkgCb.indeterminate = true;
-            pkgCb.checked = false;
-          }
-        }
-
-        function updateSelectAllState() {
-          const allClassCbs = $$(".cls-checkbox");
-          if (!selectAll || allClassCbs.length === 0) return;
-          const checked = allClassCbs.filter((c) => c.checked).length;
-          if (checked === 0) setChecked(selectAll, false);
-          else if (checked === allClassCbs.length) setChecked(selectAll, true);
-          else {
-            selectAll.indeterminate = true;
-            selectAll.checked = false;
-          }
-        }
-
-        // Package checkbox toggles all its classes
-        pkgRows.forEach((row) => {
-          const pkgCb = row.querySelector(".pkg-checkbox");
-          const classCbs = $$(".cls-checkbox", row);
-
-          if (pkgCb) {
-            pkgCb.addEventListener("change", () => {
-              classCbs.forEach((c) => setChecked(c, pkgCb.checked));
-              updatePkgStateForRow(row);
-              updateSelectAllState();
-            });
-          }
-
-          classCbs.forEach((c) => {
-            c.addEventListener("change", () => {
-              updatePkgStateForRow(row);
-              updateSelectAllState();
-            });
-          });
-
-          // Initialize per-package state
-          updatePkgStateForRow(row);
-        });
-
-        // Select-all toggles every package + every class
-        if (selectAll) {
-          selectAll.addEventListener("change", () => {
-            const allClassCbs = $$(".cls-checkbox");
-            const allPkgCbs = $$(".pkg-checkbox");
-            allClassCbs.forEach((c) => setChecked(c, selectAll.checked));
-            allPkgCbs.forEach((p) => setChecked(p, selectAll.checked));
-            selectAll.indeterminate = false;
-          });
-        }
-
-        // Initialize global state
-        updateSelectAllState();
-      })();
-    </script>
+    <script src="/js/select.js" defer></script>
   </body>
 </html>

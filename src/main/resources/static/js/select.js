@@ -1,73 +1,65 @@
-// select.js — cascade checkboxes: select-all ⇄ packages ⇄ classes
-
 (() => {
-  const $ = (sel, ctx) => (ctx || document).querySelector(sel);
-  const $$ = (sel, ctx) => Array.from((ctx || document).querySelectorAll(sel));
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  const selectAll = $("#select-all");
-  const pkgRows = $$(".pkg-row");
+  const selectAll = $("#selectAll");
+  const pkgBlocks = $$(".pkg");
 
-  function setChecked(cb, v) {
-    if (!cb) return;
+  function setChecked(cb, on) {
+    cb.checked = !!on;
     cb.indeterminate = false;
-    cb.checked = v;
   }
 
-  function updatePkgStateForRow(row) {
-    const pkgCb = $(".pkg-checkbox", row);
-    const classCbs = $$(".cls-checkbox", row);
-    if (!pkgCb || classCbs.length === 0) return;
-
-    const checked = classCbs.filter((c) => c.checked).length;
+  function updatePkgState(pkgEl) {
+    const classes = $$(".cls-checkbox", pkgEl);
+    const head = $(".pkg-checkbox", pkgEl);
+    const checked = classes.filter((c) => c.checked).length;
     if (checked === 0) {
-      pkgCb.indeterminate = false;
-      pkgCb.checked = false;
-    } else if (checked === classCbs.length) {
-      pkgCb.indeterminate = false;
-      pkgCb.checked = true;
+      head.checked = false;
+      head.indeterminate = false;
+    } else if (checked === classes.length) {
+      head.checked = true;
+      head.indeterminate = false;
     } else {
-      pkgCb.indeterminate = true;
-      pkgCb.checked = false;
+      head.checked = false;
+      head.indeterminate = true;
     }
   }
 
   function updateSelectAllState() {
     const allClassCbs = $$(".cls-checkbox");
-    if (!selectAll || allClassCbs.length === 0) return;
-
     const checked = allClassCbs.filter((c) => c.checked).length;
-    if (checked === 0) setChecked(selectAll, false);
-    else if (checked === allClassCbs.length) setChecked(selectAll, true);
-    else {
-      selectAll.indeterminate = true;
+    if (checked === 0) {
+      setChecked(selectAll, false);
+    } else if (checked === allClassCbs.length) {
+      setChecked(selectAll, true);
+    } else {
       selectAll.checked = false;
+      selectAll.indeterminate = true;
     }
   }
 
-  // Package checkbox toggles all its classes
-  $$(".pkg-row").forEach((row) => {
-    const pkgCb = $(".pkg-checkbox", row);
-    const classCbs = $$(".cls-checkbox", row);
-
-    if (pkgCb) {
-      pkgCb.addEventListener("change", () => {
-        classCbs.forEach((c) => setChecked(c, pkgCb.checked));
-        updatePkgStateForRow(row);
-        updateSelectAllState();
-      });
-    }
-
-    classCbs.forEach((c) => {
-      c.addEventListener("change", () => {
-        updatePkgStateForRow(row);
-        updateSelectAllState();
-      });
+  // Package checkbox toggles its classes
+  pkgBlocks.forEach((pkgEl) => {
+    const headCb = $(".pkg-checkbox", pkgEl);
+    headCb.addEventListener("change", () => {
+      const classes = $$(".cls-checkbox", pkgEl);
+      classes.forEach((c) => setChecked(c, headCb.checked));
+      updatePkgState(pkgEl);
+      updateSelectAllState();
     });
-
-    updatePkgStateForRow(row);
   });
 
-  // Select-all toggles EVERY package + EVERY class
+  // Class checkbox updates package and global states
+  $$(".cls-checkbox").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const pkgEl = cb.closest(".pkg");
+      updatePkgState(pkgEl);
+      updateSelectAllState();
+    });
+  });
+
+  // Select all toggles everything
   if (selectAll) {
     selectAll.addEventListener("change", () => {
       const allClassCbs = $$(".cls-checkbox");
@@ -78,5 +70,7 @@
     });
   }
 
+  // Initialize state on load
+  pkgBlocks.forEach(updatePkgState);
   updateSelectAllState();
 })();
