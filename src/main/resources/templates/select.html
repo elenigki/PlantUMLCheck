@@ -20,17 +20,24 @@
         margin: 6px 0 22px;
       }
 
-      /* Grid – the FORM is a grid so mode can span, but mode content is compact */
+      /* Grid – the FORM is a grid.
+       Two-column layout only when PlantUML exists (we add .has-uml on the form). */
       form.layout {
         display: grid;
-        grid-template-columns: 1fr;
         gap: 18px;
         align-items: start;
       }
       @media (min-width: 980px) {
-        form.layout {
+        form.layout.has-uml {
           grid-template-columns: 1.25fr 0.75fr;
         }
+      }
+
+      /* Helper: centered narrow content when not in two-column layout */
+      .centered-narrow {
+        max-width: 820px;
+        margin: 0 auto;
+        width: 100%;
       }
 
       /* Cards */
@@ -221,11 +228,19 @@
     </header>
 
     <main class="wrap" th:with="uml=${plantumlNames}, isCodeOnly=${codeOnly}">
-      <form method="post" th:action="@{/select/confirm}" class="layout">
+      <!-- Add 'has-uml' class only when PlantUML list exists AND not code-only -->
+      <form
+        method="post"
+        th:action="@{/select/confirm}"
+        th:class="'layout' + (${uml != null and !uml.isEmpty() and !isCodeOnly} ? ' has-uml' : '')"
+      >
         <input type="hidden" name="codeOnly" th:value="${codeOnly}" />
 
         <!-- MODE -->
-        <section class="card mode-card">
+        <section
+          class="card mode-card"
+          th:classappend="${not (uml != null and !uml.isEmpty() and !isCodeOnly)} ? ' centered-narrow' : ''"
+        >
           <div class="card-head mode-head">
             <span class="step">Mode</span>
             <h2
@@ -273,7 +288,10 @@
         </section>
 
         <!-- PACKAGES & CLASSES -->
-        <section class="card">
+        <section
+          class="card"
+          th:classappend="${not (uml != null and !uml.isEmpty() and !isCodeOnly)} ? ' centered-narrow' : ''"
+        >
           <div class="card-head">
             <span class="step">Choose</span>
             <h2 class="card-title">Packages &amp; Classes</h2>
@@ -319,7 +337,7 @@
           </div>
         </section>
 
-        <!-- PLANTUML -->
+        <!-- PLANTUML (only when present and not code-only) -->
         <aside
           class="card"
           th:if="${uml != null and !uml.isEmpty() and !isCodeOnly}"
