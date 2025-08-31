@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PlantUMLCheck – Home</title>
     <link rel="stylesheet" href="/css/app.css" />
+    <style>
+      /* Sticky footer for the homepage continue button, keeps existing styling intact */
+      .sticky-actions {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid #e7e9f0;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+        padding: 14px 18px;
+        z-index: 5;
+      }
+      .sticky-actions .actions {
+        margin: 0; /* override any top margins so the bar is tight */
+      }
+    </style>
   </head>
   <body>
     <header class="app-header">
@@ -142,10 +157,13 @@
           </div>
         </section>
 
-        <div class="actions center">
-          <button type="submit" class="btn primary" id="continue-btn">
-            Continue
-          </button>
+        <!-- Sticky continue bar -->
+        <div class="sticky-actions">
+          <div class="actions center">
+            <button type="submit" class="btn primary" id="continue-btn">
+              Continue
+            </button>
+          </div>
         </div>
       </form>
     </main>

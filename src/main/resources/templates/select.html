@@ -2,7 +2,6 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PlantUMLCheck – Selection</title>
     <link rel="stylesheet" href="/css/app.css" />
     <style>
@@ -21,15 +20,15 @@
         margin: 6px 0 22px;
       }
 
-      /* Grid */
-      .layout {
+      /* Grid – the FORM is a grid so mode can span, but mode content is compact */
+      form.layout {
         display: grid;
         grid-template-columns: 1fr;
         gap: 18px;
         align-items: start;
       }
       @media (min-width: 980px) {
-        .layout {
+        form.layout {
           grid-template-columns: 1.25fr 0.75fr;
         }
       }
@@ -63,7 +62,7 @@
         color: #3730a3;
       }
 
-      /* Toolbar & actions */
+      /* Toolbar */
       .toolbar {
         display: flex;
         align-items: center;
@@ -77,14 +76,73 @@
         align-items: center;
         gap: 10px;
       }
-      .actions {
+
+      /* Sticky footer actions */
+      .actions-bar {
+        grid-column: 1 / -1;
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid #e7e9f0;
         display: flex;
         justify-content: center;
         gap: 12px;
-        padding: 0 18px 18px;
+        padding: 14px 18px;
+        z-index: 5;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+      }
+      .actions-bar .btn {
+        text-decoration: none;
+      } /* ensure no underline on links */
+
+      /* Lavender back button */
+      .btn.lavender {
+        background: linear-gradient(135deg, #c4b5fd, #a78bfa);
+        color: #fff;
+      }
+      .btn.lavender:hover {
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
       }
 
-      /* Package list */
+      /* MODE card */
+      .mode-card {
+        grid-column: 1 / -1;
+      }
+      .mode-head .step {
+        background: #ecfdf5;
+        border-color: #bbf7d0;
+        color: #065f46;
+      }
+      .mode-inner {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .mode-row {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .radio-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        border: 1px solid var(--border, #e7e9f0);
+        border-radius: 12px;
+        padding: 12px 14px;
+        width: 100%;
+      }
+      .radio-card input {
+        margin-top: 3px;
+      }
+      .radio-title {
+        font-weight: 700;
+      }
+      .radio-desc {
+        color: var(--muted, #6b7280);
+        font-size: 0.92rem;
+      }
+
+      /* Packages & classes */
       .pkg {
         border: 1px solid var(--border, #e7e9f0);
         border-radius: 14px;
@@ -162,15 +220,60 @@
       </p>
     </header>
 
-    <main class="wrap">
-      <div
-        class="layout"
-        th:with="uml=${plantumlNames}, isCodeOnly=${codeOnly}"
-      >
-        <!-- LEFT: Packages & Classes (form card) -->
-        <form method="post" th:action="@{/select/confirm}" class="card">
-          <input type="hidden" name="codeOnly" th:value="${codeOnly}" />
+    <main class="wrap" th:with="uml=${plantumlNames}, isCodeOnly=${codeOnly}">
+      <form method="post" th:action="@{/select/confirm}" class="layout">
+        <input type="hidden" name="codeOnly" th:value="${codeOnly}" />
 
+        <!-- MODE -->
+        <section class="card mode-card">
+          <div class="card-head mode-head">
+            <span class="step">Mode</span>
+            <h2
+              class="card-title"
+              th:text="${isCodeOnly} ? 'Generation Options' : 'Comparison Options'"
+            >
+              Options
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="mode-inner">
+              <div class="mode-row">
+                <label class="radio-card">
+                  <input type="radio" name="mode" value="STRICT" checked />
+                  <div>
+                    <div class="radio-title">Strict</div>
+                    <div
+                      class="radio-desc"
+                      th:text="${isCodeOnly}
+                      ? 'Generate UML with exact signatures and modifiers.'
+                      : 'Match exact signatures, types, visibilities, static/abstract, and relationships.'"
+                    >
+                      Strict description
+                    </div>
+                  </div>
+                </label>
+
+                <label class="radio-card">
+                  <input type="radio" name="mode" value="RELAXED" />
+                  <div>
+                    <div class="radio-title">Relaxed</div>
+                    <div
+                      class="radio-desc"
+                      th:text="${isCodeOnly}
+                      ? 'Generate a simplified UML (ignore minor modifiers/order).'
+                      : 'Be lenient on relationship details (association vs aggregation, multiplicities) as long as the relationship exists and direction/generalization are correct.'"
+                    >
+                      Relaxed description
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PACKAGES & CLASSES -->
+        <section class="card">
           <div class="card-head">
             <span class="step">Choose</span>
             <h2 class="card-title">Packages &amp; Classes</h2>
@@ -214,16 +317,9 @@
               </div>
             </div>
           </div>
+        </section>
 
-          <div class="actions">
-            <a class="btn" th:href="@{/}">← Back</a>
-            <button class="btn primary" type="submit">
-              Continue to Parsing
-            </button>
-          </div>
-        </form>
-
-        <!-- RIGHT: PlantUML (separate card; outside the form) -->
+        <!-- PLANTUML -->
         <aside
           class="card"
           th:if="${uml != null and !uml.isEmpty() and !isCodeOnly}"
@@ -244,7 +340,13 @@
             </div>
           </div>
         </aside>
-      </div>
+
+        <!-- Sticky actions -->
+        <div class="actions-bar">
+          <a class="btn lavender" th:href="@{/}">Back</a>
+          <button class="btn primary" type="submit">Continue</button>
+        </div>
+      </form>
     </main>
 
     <script src="/js/select.js" defer></script>
