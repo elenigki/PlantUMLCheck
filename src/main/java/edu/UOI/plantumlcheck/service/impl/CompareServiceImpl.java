@@ -3,6 +3,7 @@ package edu.UOI.plantumlcheck.service.impl;
 import comparison.CheckMode;
 import comparison.ModelComparator;
 import comparison.issues.Difference;
+import comparison.issues.IssueLevel;
 import comparison.report.ReportPrinter;
 import comparison.export.PlantUmlWriter;
 import edu.UOI.plantumlcheck.service.CompareService;
@@ -18,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class CompareServiceImpl implements CompareService {
@@ -47,13 +49,27 @@ public class CompareServiceImpl implements CompareService {
                 diffs = cmp.compare(codeModel, umlModel);
             }
 
-            // Summary
+            // --- Roll-up / Summary ---
             int codeCount = sizeSafe(codeModel.getClasses());
             int umlCount  = (umlModel == null) ? 0 : sizeSafe(umlModel.getClasses());
             int analyzed  = codeCount; // we parsed only selected classes
-            int diffCount = diffs.size();
-            int matchCount = Math.max(0, analyzed - diffCount);
 
+            // Consistency:
+            // STRICT  -> fail if any diff
+            // RELAXED / RELAXED_PLUS -> fail only if there's at least one ERROR
+            boolean hasErrors = hasLevel(diffs, IssueLevel.ERROR);
+            boolean consistent = sel.codeOnly() ||
+                    switch (checkMode) {
+                        case STRICT -> diffs.isEmpty();
+                        case RELAXED, RELAXED_PLUS -> !hasErrors;
+                    };
+
+            // Matches: classes with zero diffs (by tolerant parsing of Difference.where)
+            Set<String> codeClassNames = classNamesOf(codeModel);
+            Set<String> classesWithDiffs = classNamesMentionedInDiffs(diffs, codeClassNames);
+            int matchCount = Math.max(0, analyzed - classesWithDiffs.size());
+
+            int diffCount = diffs.size();
             Summary sum = new Summary(codeCount, umlCount, analyzed, matchCount, diffCount);
 
             // Report
@@ -64,8 +80,6 @@ public class CompareServiceImpl implements CompareService {
             if (sel.codeOnly()) {
                 generatedPuml = PlantUmlWriter.generate(checkMode, codeModel, null, List.of());
             }
-
-            boolean consistent = sel.codeOnly() || diffs.isEmpty();
 
             return new RunResult(consistent, sel.codeOnly(), sel.mode(), sum, diffs, reportText, generatedPuml, notices);
 
@@ -128,4 +142,71 @@ public class CompareServiceImpl implements CompareService {
     }
 
     private static int sizeSafe(List<?> list) { return (list == null) ? 0 : list.size(); }
+
+    // --- roll-up utilities ---
+
+    private static boolean hasLevel(List<Difference> diffs, IssueLevel lvl) {
+        if (diffs == null || diffs.isEmpty()) return false;
+        for (Difference d : diffs) {
+            if (d != null && d.getLevel() == lvl) return true;
+        }
+        return false;
+    }
+
+    private static Set<String> classNamesOf(IntermediateModel model) {
+        if (model == null || model.getClasses() == null) return Set.of();
+        return model.getClasses().stream()
+                .map(ClassInfo::getName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
+     * Try to attribute diffs to code classes by parsing Difference.where.
+     * Expected formats include "Class#member", "Class#method(...)".
+     * For relationship diffs which may not start with a class name, this is conservative.
+     */
+    private static Set<String> classNamesMentionedInDiffs(List<Difference> diffs, Set<String> knownCodeClasses) {
+        Set<String> out = new LinkedHashSet<>();
+        if (diffs == null) return out;
+
+        for (Difference d : diffs) {
+            if (d == null) continue;
+            String where = d.getWhere();
+            if (where == null) continue;
+
+            String cls = before(where, '#'); // "Class#..."
+            if (cls == null || cls.isBlank()) {
+                // Fallback: sometimes there is no '#'
+                cls = firstToken(where);
+            }
+            if (cls != null && knownCodeClasses.contains(cls)) {
+                out.add(cls);
+            } else {
+                // Relationship diffs might include "A -> B"
+                for (String k : knownCodeClasses) {
+                    if (where.contains(k)) {
+                        out.add(k);
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static String before(String s, char ch) {
+        int i = s.indexOf(ch);
+        if (i < 0) return null;
+        return s.substring(0, i);
+    }
+
+    private static String firstToken(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!Character.isJavaIdentifierPart(c) && c != '.' ) {
+                return s.substring(0, i);
+            }
+        }
+        return s;
+    }
 }
