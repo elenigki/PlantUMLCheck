@@ -25,23 +25,29 @@ public class CompareServiceImpl implements CompareService {
     @Override
     public RunResult run(Selection sel) {
         try {
-            // 1) Parse Java for selected classes
+            // Parse Java (selected classes)
             IntermediateModel codeModel = parseSelectedJava(sel.workspaceRoot(), sel.selectedFqcns());
             List<String> notices = new ArrayList<>(codeModel.getWarnings());
 
             IntermediateModel umlModel = null;
             List<Difference> diffs = List.of();
-            CheckMode checkMode = (sel.mode() == Mode.RELAXED) ? CheckMode.RELAXED : CheckMode.STRICT;
 
-            // 2) Parse PlantUML + compare (when not code-only)
+            // Map UI mode -> comparator mode (STRICT / RELAXED / RELAXED_PLUS)
+            CheckMode checkMode = switch (sel.mode()) {
+                case STRICT -> CheckMode.STRICT;
+                case RELAXED_PLUS -> CheckMode.RELAXED_PLUS;
+                case RELAXED -> CheckMode.RELAXED;
+            };
+
             if (!sel.codeOnly()) {
+                // Parse PlantUML & compare
                 umlModel = parsePlantUmlFiles(sel.plantumlFiles());
                 notices.addAll(umlModel.getWarnings());
                 ModelComparator cmp = new ModelComparator(checkMode);
                 diffs = cmp.compare(codeModel, umlModel);
             }
 
-            // 3) Summary stats
+            // Summary
             int codeCount = sizeSafe(codeModel.getClasses());
             int umlCount  = (umlModel == null) ? 0 : sizeSafe(umlModel.getClasses());
             int analyzed  = codeCount; // we parsed only selected classes
@@ -50,10 +56,10 @@ public class CompareServiceImpl implements CompareService {
 
             Summary sum = new Summary(codeCount, umlCount, analyzed, matchCount, diffCount);
 
-            // 4) Report
+            // Report
             String reportText = ReportPrinter.toText(diffs, checkMode);
 
-            // 5) Generated PlantUML in code-only mode
+            // Generated PlantUML in code-only mode
             String generatedPuml = null;
             if (sel.codeOnly()) {
                 generatedPuml = PlantUmlWriter.generate(checkMode, codeModel, null, List.of());
@@ -88,7 +94,6 @@ public class CompareServiceImpl implements CompareService {
             Path p = Paths.get(root).resolve(rel);
 
             if (!Files.exists(p)) {
-                // fallback: scan for a filename match (handles default package/alternate layout)
                 try (var stream = Files.walk(Paths.get(root))) {
                     Optional<Path> hit = stream
                             .filter(pp -> pp.getFileName().toString().equals(simpleName(fqcn) + ".java"))

@@ -1,24 +1,26 @@
 package edu.UOI.plantumlcheck.service;
 
 import comparison.issues.Difference;
-
 import java.util.List;
 
 public interface CompareService {
 
-    enum Mode { STRICT, RELAXED }
+    enum Mode { STRICT, RELAXED, RELAXED_PLUS }
 
     record Selection(
-            String workspaceRoot,        // absolute path to workspace root where code lives
-            List<String> selectedFqcns,  // FQCNs chosen on /select (e.g., com.example.Account)
+            String workspaceRoot,
+            List<String> selectedFqcns,
             boolean codeOnly,
             Mode mode,
-            List<String> plantumlFiles   // absolute paths to uploaded PlantUML files (may be empty)
+            List<String> plantumlFiles
     ) {}
 
     record Summary(
-            int codeClasses, int umlClasses, int analyzedClasses,
-            int matches, int differences
+            int codeClasses,
+            int umlClasses,
+            int analyzedClasses,
+            int matches,
+            int differences
     ) {}
 
     record RunResult(
@@ -27,10 +29,10 @@ public interface CompareService {
             Mode modeUsed,
             Summary summary,
             List<Difference> differences,
-            String textReport,           // ReportPrinter.toText(...)
-            String generatedPlantUml,    // non-null in code-only (generated UML). null in compare mode (for now)
-            List<String> notices         // parser warnings etc
+            String reportText,
+            String generatedPlantUml,
+            List<String> notices
     ) {}
 
-    RunResult run(Selection selection);
+    RunResult run(Selection sel);
 }

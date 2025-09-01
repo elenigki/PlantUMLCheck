@@ -2,8 +2,15 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  // Existing structure
   const selectAll = $("#selectAll");
   const pkgBlocks = $$(".pkg");
+
+  // New bits
+  const continueBtn =
+    $("#continue-btn") || $("#continueBtn") || $("button[type='submit']");
+  const needOne = $("#needOne");
+  const form = $("#select-form") || $("form");
 
   function setChecked(cb, on) {
     cb.checked = !!on;
@@ -34,19 +41,29 @@
     } else if (checked === allClassCbs.length) {
       setChecked(selectAll, true);
     } else {
-      selectAll.checked = false;
-      selectAll.indeterminate = true;
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+      }
     }
+  }
+
+  // NEW: disable/enable Continue based on at least one class selected
+  function updateContinueState() {
+    const hasAny = $$(".cls-checkbox").some((c) => c.checked);
+    if (continueBtn) continueBtn.disabled = !hasAny;
+    if (needOne) needOne.classList.toggle("show", !hasAny);
   }
 
   // Package checkbox toggles its classes
   pkgBlocks.forEach((pkgEl) => {
     const headCb = $(".pkg-checkbox", pkgEl);
-    headCb.addEventListener("change", () => {
+    headCb?.addEventListener("change", () => {
       const classes = $$(".cls-checkbox", pkgEl);
       classes.forEach((c) => setChecked(c, headCb.checked));
       updatePkgState(pkgEl);
       updateSelectAllState();
+      updateContinueState();
     });
   });
 
@@ -54,8 +71,9 @@
   $$(".cls-checkbox").forEach((cb) => {
     cb.addEventListener("change", () => {
       const pkgEl = cb.closest(".pkg");
-      updatePkgState(pkgEl);
+      if (pkgEl) updatePkgState(pkgEl);
       updateSelectAllState();
+      updateContinueState();
     });
   });
 
@@ -67,10 +85,24 @@
       allClassCbs.forEach((c) => setChecked(c, selectAll.checked));
       allPkgCbs.forEach((p) => setChecked(p, selectAll.checked));
       selectAll.indeterminate = false;
+      // After bulk toggle, ensure states are refreshed
+      pkgBlocks.forEach(updatePkgState);
+      updateContinueState();
+    });
+  }
+
+  // Prevent submit if disabled (extra safety)
+  if (form && continueBtn) {
+    form.addEventListener("submit", (e) => {
+      if (continueBtn.disabled) {
+        e.preventDefault();
+        needOne?.classList.add("show");
+      }
     });
   }
 
   // Initialize state on load
   pkgBlocks.forEach(updatePkgState);
   updateSelectAllState();
+  updateContinueState();
 })();

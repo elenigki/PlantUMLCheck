@@ -9,8 +9,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 public class SelectionController {
@@ -21,61 +23,128 @@ public class SelectionController {
         this.compareService = compareService;
     }
 
+    // ---------- GET: selection screen ----------
     @GetMapping("/select")
     public String selectPreview(Model model, HttpSession session) {
-        copyIfMissing("selectionSummary", model, session);
-        copyIfMissing("workspaceRoot", model, session);
-        copyIfMissing("scanMap", model, session);
-        copyIfMissing("plantumlNames", model, session);
-        copyIfMissing("codeOnly", model, session);
+        copyFromSessionIfMissing("selectionSummary", model, session);
+        copyFromSessionIfMissing("workspaceRoot", model, session);
+        copyFromSessionIfMissing("scanMap", model, session);
+        copyFromSessionIfMissing("plantumlNames", model, session);
+        copyFromSessionIfMissing("codeOnly", model, session);
+
+        // Null-safe defaults to prevent Thymeleaf errors
+        if (model.getAttribute("scanMap") == null) {
+            model.addAttribute("scanMap", Map.of());
+        }
+
+        // Mode default (RELAXED) if not set yet
+        Object m = session.getAttribute("mode");
+        model.addAttribute("mode", (m instanceof String s && !s.isBlank()) ? s : "RELAXED");
+
+        // codeOnly fallback if not present in model
+        if (model.getAttribute("codeOnly") == null) {
+            boolean codeOnly = false;
+            Object ss = model.getAttribute("selectionSummary");
+            try {
+                if (ss != null) {
+                    var meth = ss.getClass().getMethod("codeOnly");
+                    Object val = meth.invoke(ss);
+                    if (val instanceof Boolean b) codeOnly = b;
+                }
+            } catch (Exception ignored) { }
+            model.addAttribute("codeOnly", codeOnly);
+            session.setAttribute("codeOnly", codeOnly);
+        }
+
         return "select";
     }
 
+    // ---------- POST: run parse/compare ----------
     @PostMapping("/select/confirm")
-    public String confirm(@RequestParam("codeOnly") boolean codeOnly,
-                          @RequestParam("mode") String mode,
-                          @RequestParam(value = "cls", required = false) List<String> selectedFqcns,
-                          HttpSession session,
-                          Model model) {
+    public String confirmSelection(
+            @RequestParam("workspaceRoot") String workspaceRoot,
+            @RequestParam(value = "selectedFqcns", required = false) List<String> selectedFqcns,
+            @RequestParam(value = "codeOnly") boolean codeOnly,
+            @RequestParam(value = "mode", defaultValue = "RELAXED") String modeStr,
+            HttpSession session,
+            Model model
+    ) {
+        if (selectedFqcns == null) selectedFqcns = List.of();
 
-        if (selectedFqcns == null || selectedFqcns.isEmpty()) {
-            model.addAttribute("error", "Please choose at least one class.");
-            return "select";
-        }
+        // Resolve PlantUML file paths (if any) from session (either full paths or just names)
+        List<String> plantumlFiles = resolvePlantUmlFiles(session, workspaceRoot);
 
-        String workspaceRoot = (String) session.getAttribute("workspaceRoot");
-        if (workspaceRoot == null) {
-            model.addAttribute("error", "Workspace expired. Please re-upload files.");
-            return "index";
-        }
+        // Normalize mode from string (STRICT / RELAXED / RELAXED_PLUS)
+        Mode mode = toMode(modeStr);
 
-        @SuppressWarnings("unchecked")
-        List<String> plantumlFiles = (List<String>) session.getAttribute("plantumlFiles");
-        if (plantumlFiles == null) plantumlFiles = new ArrayList<>();
-
-        // Remember for results header
+        // Persist choices to session so refresh/back works
+        session.setAttribute("mode", mode.name());
         session.setAttribute("codeOnly", codeOnly);
-        session.setAttribute("mode", mode);
 
-        Selection sel = new Selection(
+        // Run comparison
+        CompareService.Selection sel = new Selection(
                 workspaceRoot,
                 selectedFqcns,
                 codeOnly,
-                "RELAXED".equalsIgnoreCase(mode) ? Mode.RELAXED : Mode.STRICT,
+                mode,
                 plantumlFiles
         );
-
         RunResult result = compareService.run(sel);
 
-        // keep for downloads
-        session.setAttribute("lastReportText", result.textReport());
-        session.setAttribute("lastGeneratedPuml", result.generatedPlantUml());
+        // Store for results page + downloads
+        session.setAttribute("lastResult", result);
+        //session.setAttribute("lastReport", result.reportText());   // used later by /results/report.txt
+        session.setAttribute("lastUml", result.generatedPlantUml()); // used later by /results/uml.puml
 
+        // Put in model for immediate render
         model.addAttribute("result", result);
+
         return "results";
     }
 
-    private static void copyIfMissing(String key, Model model, HttpSession session) {
+    private static Mode toMode(String s) {
+        if (s == null) return Mode.RELAXED;
+        switch (s.trim().toUpperCase(Locale.ROOT)) {
+            case "STRICT": return Mode.STRICT;
+            case "RELAXED_PLUS": return Mode.RELAXED_PLUS;
+            case "RELAXED":
+            default: return Mode.RELAXED;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> resolvePlantUmlFiles(HttpSession session, String workspaceRoot) {
+        // Try full paths list first
+        Object filesObj = session.getAttribute("plantumlFiles");
+        if (filesObj instanceof List<?> raw) {
+            List<String> asStrings = raw.stream().map(Object::toString).collect(Collectors.toList());
+            if (!asStrings.isEmpty()) return asStrings;
+        }
+
+        // Otherwise, try plantumlNames (filenames) and search them under the workspace
+        Object namesObj = session.getAttribute("plantumlNames");
+        if (namesObj instanceof List<?> nameList && !nameList.isEmpty()) {
+            List<String> hits = new ArrayList<>();
+            for (Object o : nameList) {
+                String name = String.valueOf(o);
+                try {
+                    // Walk workspace for filename match
+                    try (var stream = Files.walk(Paths.get(workspaceRoot))) {
+                        Optional<Path> p = stream
+                                .filter(pp -> pp.getFileName().toString().equals(name))
+                                .findFirst();
+                        p.ifPresent(path -> hits.add(path.toAbsolutePath().toString()));
+                    }
+                } catch (IOException ignored) {}
+            }
+            if (!hits.isEmpty()) return hits;
+        }
+
+        // No PlantUML inputs
+        return List.of();
+    }
+
+    private static void copyFromSessionIfMissing(String key, Model model, HttpSession session) {
         if (model.getAttribute(key) == null) {
             Object v = session.getAttribute(key);
             if (v != null) model.addAttribute(key, v);
