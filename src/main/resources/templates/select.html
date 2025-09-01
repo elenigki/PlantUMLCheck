@@ -218,6 +218,41 @@
         background: #10b981;
       }
     </style>
+
+    <style>
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 24, 39, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+      .overlay .panel {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e7e9f0;
+        padding: 18px 22px;
+        width: 340px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+      }
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        border: 3px solid #e5e7eb;
+        border-top-color: #10b981;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
     <header class="app-header">
@@ -365,8 +400,31 @@
           <button class="btn primary" type="submit">Continue</button>
         </div>
       </form>
+
+      <div id="processingOverlay" class="overlay">
+        <div class="panel">
+          <div class="spinner"></div>
+          <h3 style="margin: 4px 0 6px">Working…</h3>
+          <p class="muted" style="margin: 0">
+            Parsing selected Java<span th:if="${!codeOnly}"> and PlantUML</span
+            >…
+          </p>
+        </div>
+      </div>
     </main>
 
     <script src="/js/select.js" defer></script>
+    <script>
+      // Show overlay on submit
+      window.addEventListener("DOMContentLoaded", () => {
+        const form = document.querySelector("form.layout");
+        const ov = document.getElementById("processingOverlay");
+        if (form && ov) {
+          form.addEventListener("submit", () => {
+            ov.style.display = "flex";
+          });
+        }
+      });
+    </script>
   </body>
 </html>

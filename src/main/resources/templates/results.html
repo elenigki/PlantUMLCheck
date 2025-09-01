@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PlantUMLCheck – Results</title>
+    <link rel="stylesheet" href="/css/app.css" />
+
+    <style>
+      :root {
+        --card-br: 16px;
+        --card-bd: #e7e9f0;
+        --muted: #6b7280;
+
+        --ok: #10b981;
+        --ok-bg: #ecfdf5;
+        --ok-bd: #bbf7d0;
+
+        --err: #991b1b;
+        --err-bg: #fef2f2;
+        --err-bd: #fecaca;
+
+        --warn: #92400e;
+        --warn-bg: #fef3c7;
+        --warn-bd: #fde68a;
+
+        --chip-bg: #f2f4f8;
+        --chip-bd: #e4e7ef;
+
+        --info: #1d4ed8;
+        --info-bg: #eff6ff;
+        --info-bd: #bfdbfe;
+
+        --lav-a: #c4b5fd;
+        --lav-b: #a78bfa;
+        --lav-h: #8b5cf6;
+        --pri-a: #14b8a6;
+        --pri-b: #0ea5a3;
+        --pri-h: #0d9488;
+      }
+
+      .wrap {
+        max-width: 1180px;
+        margin: 36px auto;
+        padding: 0 16px;
+      }
+      .mode-chip {
+        font-size: 0.8rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip-bg);
+        border: 1px solid var(--chip-bd);
+      }
+      .headline {
+        margin: 0 0 6px 0;
+        font-size: 2.15rem;
+        letter-spacing: 0.2px;
+      }
+
+      .card {
+        background: #fff;
+        border: 1px solid var(--card-bd);
+        border-radius: var(--card-br);
+        box-shadow: 0 10px 25px rgba(17, 24, 39, 0.04);
+      }
+      .card-body {
+        padding: 18px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+
+      /* Summary grid – two equal columns, same height items */
+      .summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: stretch;
+      }
+      .panel {
+        display: flex;
+        height: 100%;
+      }
+      @media (max-width: 900px) {
+        .summary {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Status banner */
+      .status-banner {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        padding: 18px;
+        border-radius: 14px;
+        border: 1px solid var(--card-bd);
+        background: #fff;
+        width: 100%;
+      }
+      .status-banner.ok {
+        border-color: var(--ok-bd);
+        background: var(--ok-bg);
+      }
+      .status-banner.bad {
+        border-color: var(--err-bd);
+        background: var(--err-bg);
+      }
+
+      .status-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 1.1rem;
+        flex: 0 0 46px;
+      }
+      .status-banner.ok .status-icon {
+        background: #34d399;
+        color: #064e3b;
+      }
+      .status-banner.bad .status-icon {
+        background: #fca5a5;
+        color: #7f1d1d;
+      }
+
+      .status-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin: 0;
+      }
+      .status-sub {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      /* Chips / pills */
+      .pill {
+        font-size: 0.85rem;
+        border: 1px solid var(--chip-bd);
+        background: var(--chip-bg);
+        padding: 4px 12px;
+        border-radius: 999px;
+      }
+      .pill.info {
+        background: var(--info-bg);
+        color: #1e3a8a;
+        border-color: var(--info-bd);
+      }
+
+      /* Stats panel */
+      .stats-panel {
+        border: 1px solid var(--card-bd);
+        background: #fafbff;
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .stats-panel h3 {
+        margin: 0 0 8px 0;
+      }
+      .stats ul {
+        list-style: none;
+        margin: 8px 0 0 0;
+        padding: 0;
+      }
+      .stats li {
+        margin: 4px 0;
+      }
+      .stats b {
+        font-weight: 600;
+      }
+
+      /* Filters + differences */
+      .diff-toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 0;
+      }
+      .filter {
+        padding: 4px 10px;
+        border: 1px solid var(--card-bd);
+        border-radius: 999px;
+        background: #f8fafc;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .filter.active {
+        background: #eef2ff;
+        color: #3730a3;
+        border-color: #e2e8f0;
+      }
+      .diff-table {
+        margin-top: 12px;
+        border: 1px solid var(--card-bd);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 10px 12px;
+        align-items: center;
+      }
+      .row:nth-child(odd) {
+        background: #fafbfc;
+      }
+      .row .where {
+        font-weight: 600;
+      }
+      .lvl {
+        font-size: 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        padding: 2px 8px;
+        justify-self: end;
+      }
+      .lvl.ERROR {
+        background: var(--err-bg);
+        color: var(--err);
+        border-color: var(--err-bd);
+      }
+      .lvl.WARNING {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-color: var(--warn-bd);
+      }
+      .lvl.INFO {
+        background: #eef2f7;
+        color: #374151;
+        border-color: #e5e7eb;
+      }
+
+      /* Parser warnings */
+      details.warns > summary {
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      details.warns > summary::-webkit-details-marker {
+        display: none;
+      }
+      .warn-list {
+        margin: 8px 0 0 18px;
+        padding: 0;
+      }
+      .warn-list li {
+        margin: 4px 0;
+      }
+
+      /* Code-only UML */
+      .codewrap pre {
+        background: #0b1020;
+        color: #e5e7eb;
+        border-radius: 12px;
+        max-height: 420px;
+        overflow: auto;
+        padding: 14px;
+      }
+      .code-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      /* Sticky actions */
+      .actions-bar {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid var(--card-bd);
+        padding: 14px 18px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        z-index: 6;
+        box-shadow: 0 -8px 22px rgba(17, 24, 39, 0.06);
+      }
+      .btn {
+        border: none;
+        border-radius: 12px;
+        padding: 10px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.18s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+      .btn.primary {
+        background: linear-gradient(135deg, var(--pri-a), var(--pri-b));
+        color: #fff;
+      }
+      .btn.primary:hover {
+        background: linear-gradient(135deg, var(--pri-b), var(--pri-h));
+      }
+      .btn.ghost {
+        background: #f3f4f6;
+        color: #374151;
+      }
+      .btn.ghost:hover {
+        background: #e5e7eb;
+      }
+      .btn.lavender {
+        background: linear-gradient(135deg, var(--lav-a), var(--lav-b));
+        color: #fff;
+      }
+      .btn.lavender:hover {
+        background: linear-gradient(135deg, var(--lav-b), var(--lav-h));
+      }
+      .btn[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        background: #111827;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 10px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 20;
+        font-size: 0.9rem;
+      }
+      .toast.show {
+        opacity: 0.95;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1
+        class="headline"
+        th:text="${result.consistent} ? 'UML check PASSED' : 'UML check FAILED'"
+      >
+        UML check PASSED
+      </h1>
+      <p class="app-subtitle">
+        <span class="mode-chip" th:text="'Mode: ' + ${result.modeUsed}"
+          >Mode: STRICT</span
+        >
+        <span class="mode-chip" th:if="${result.codeOnly}">Code-only</span>
+      </p>
+    </header>
+
+    <main class="wrap">
+      <!-- Summary -->
+      <section class="card" style="margin-bottom: 18px">
+        <div class="card-body summary">
+          <!-- LEFT: Status -->
+          <div class="panel">
+            <div
+              class="status-banner"
+              th:classappend="${result.consistent} ? ' ok' : ' bad'"
+            >
+              <div
+                class="status-icon"
+                th:text="${result.consistent} ? '✓' : '!'"
+              >
+                ✓
+              </div>
+              <div>
+                <h3
+                  class="status-title"
+                  th:text="${result.consistent} ? 'UML check PASSED' : 'UML check FAILED'"
+                >
+                  UML check PASSED
+                </h3>
+                <div class="status-sub">
+                  <span class="pill info">Java parsed ✓</span>
+                  <span class="pill info" th:if="${!result.codeOnly}"
+                    >PlantUML parsed ✓</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Stats -->
+          <div class="panel">
+            <div class="stats-panel">
+              <h3>Stats</h3>
+              <div class="stats">
+                <ul>
+                  <li>
+                    <b
+                      th:text="'Analyzed classes: ' + ${result.summary.analyzedClasses}"
+                      >Analyzed classes: 0</b
+                    >
+                  </li>
+                  <li
+                    th:text="'Code classes: ' + ${result.summary.codeClasses}"
+                  >
+                    Code classes: 0
+                  </li>
+                  <li
+                    th:if="${!result.codeOnly}"
+                    th:text="'UML classes: ' + ${result.summary.umlClasses}"
+                  >
+                    UML classes: 0
+                  </li>
+                  <li
+                    style="margin-top: 6px"
+                    th:text="'Matches: ' + ${result.summary.matches} + ' · Differences: ' + ${result.summary.differences}"
+                  >
+                    Matches: 0 · Differences: 0
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Parser warnings -->
+      <section
+        class="card"
+        th:if="${result.notices != null and !result.notices.isEmpty()}"
+        style="margin-bottom: 18px"
+      >
+        <div class="card-body">
+          <details class="warns" open>
+            <summary>
+              <h3 style="margin: 0">Parser warnings</h3>
+              <span
+                class="pill"
+                th:text="${#lists.size(result.notices)} + ' item(s)'"
+                >0 item(s)</span
+              >
+            </summary>
+            <ul class="warn-list">
+              <li th:each="n : ${result.notices}" th:text="${n}">warning…</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <!-- Differences -->
+      <section class="card" th:if="${!result.codeOnly}">
+        <div class="card-body">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 8px;
+            "
+          >
+            <h3 style="margin: 0">Differences</h3>
+            <div class="diff-toolbar">
+              <button type="button" class="filter active" data-filter="ALL">
+                All
+              </button>
+              <button type="button" class="filter" data-filter="ERROR">
+                Errors
+              </button>
+              <button type="button" class="filter" data-filter="WARNING">
+                Warnings
+              </button>
+              <button type="button" class="filter" data-filter="INFO">
+                Info
+              </button>
+            </div>
+          </div>
+
+          <p
+            class="muted"
+            th:if="${result.differences == null || result.differences.isEmpty()}"
+          >
+            No differences 🎉
+          </p>
+
+          <div
+            class="diff-table"
+            th:if="${result.differences != null and !result.differences.isEmpty()}"
+          >
+            <div
+              class="row"
+              th:each="d : ${result.differences}"
+              th:attr="data-level=${d.level?.name()}"
+            >
+              <div>
+                <span class="where" th:text="${d.where}"
+                  >com.example.Class</span
+                >
+                <span class="muted"> — </span>
+                <span th:text="${d.summary}">Attribute missing in UML</span>
+              </div>
+              <span
+                class="lvl"
+                th:classappend="' ' + ${d.level?.name()}"
+                th:text="${d.level?.name()}"
+                >ERROR</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Generated UML (code-only) -->
+      <section class="card" th:if="${result.codeOnly}">
+        <div class="card-body">
+          <h3 style="margin-top: 0">Generated UML</h3>
+          <div class="codewrap">
+            <pre id="umlText" th:text="${result.generatedPlantUml}">
+@startuml
+@enduml</pre
+            >
+          </div>
+          <div class="code-actions">
+            <button type="button" class="btn ghost" onclick="copyUml()">
+              Copy
+            </button>
+            <a class="btn ghost" th:href="@{/results/uml.puml}">Download UML</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sticky actions -->
+      <div class="actions-bar">
+        <a class="btn lavender" th:href="@{/select}">Back to selection</a>
+        <a class="btn ghost" th:href="@{/results/report.txt}"
+          >Export report (txt)</a
+        >
+        <a
+          class="btn ghost"
+          th:if="${result.generatedPlantUml != null}"
+          th:href="@{/results/uml.puml}"
+          >Export UML</a
+        >
+        <button
+          class="btn primary"
+          type="button"
+          disabled
+          title="Coming soon: create a corrected UML script based on selected mode"
+        >
+          Generate corrected UML
+        </button>
+      </div>
+
+      <div id="toast" class="toast">Copied!</div>
+    </main>
+
+    <script>
+      // Differences level filter
+      const filters = document.querySelectorAll(".filter");
+      const rows = document.querySelectorAll(".diff-table .row");
+      filters.forEach((b) =>
+        b.addEventListener("click", () => {
+          filters.forEach((x) => x.classList.remove("active"));
+          b.classList.add("active");
+          const f = b.dataset.filter;
+          rows.forEach((r) => {
+            const lvl = r.getAttribute("data-level") || "INFO";
+            r.style.display = f === "ALL" || f === lvl ? "" : "none";
+          });
+        })
+      );
+
+      // Copy UML helper
+      function copyUml() {
+        const txt = document.getElementById("umlText")?.textContent || "";
+        navigator.clipboard.writeText(txt).then(() => {
+          const t = document.getElementById("toast");
+          t.classList.add("show");
+          setTimeout(() => t.classList.remove("show"), 1100);
+        });
+      }
+    </script>
+  </body>
+</html>

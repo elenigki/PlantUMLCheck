@@ -1,0 +1,5 @@
+@startuml
+class Customer
+class Item
+Customer -- Item
+@enduml

@@ -13,9 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
@@ -28,9 +27,7 @@ public class HomeController {
     }
 
     @GetMapping("/")
-    public String home() {
-        return "index";
-    }
+    public String home() { return "index"; }
 
     @PostMapping("/analyze")
     public String analyze(@RequestParam(name = "plantuml", required = false) MultipartFile[] plantuml,
@@ -54,11 +51,11 @@ public class HomeController {
             return "index";
         }
 
-        // Filenames for UI
         List<String> plantumlNames = (plantuml == null) ? List.of() :
                 Arrays.stream(plantuml)
                         .filter(f -> f != null && !f.isEmpty())
                         .map(MultipartFile::getOriginalFilename)
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toList());
 
         List<String> sourceNames = (source == null) ? List.of() :
@@ -70,51 +67,45 @@ public class HomeController {
         SelectionSummary summary = new SelectionSummary(plantumlNames, sourceNames, codeOnly);
 
         try {
-            // Save source files to workspace + quick scan
+            // 1) Save source to workspace
             Workspace ws = scanService.saveSourceToWorkspace(source);
-            String root = ws.root().toString();
-            Map<String, List<String>> scanMap = scanService.buildPackageMap(ws.root());
+            Path root = ws.root();
 
-            // Flash + Session (so /select works after redirect or refresh)
+            // 2) Save PlantUML files into workspace/uml (record absolute paths)
+            List<String> plantumlFiles = new ArrayList<>();
+            if (!codeOnly && plantuml != null) {
+                Path umlDir = root.resolve("uml");
+                Files.createDirectories(umlDir);
+                for (MultipartFile mf : plantuml) {
+                    if (mf == null || mf.isEmpty() || mf.getOriginalFilename() == null) continue;
+                    Path dest = umlDir.resolve(Paths.get(mf.getOriginalFilename()).getFileName().toString());
+                    Files.write(dest, mf.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                    plantumlFiles.add(dest.toAbsolutePath().toString());
+                }
+            }
+
+            // 3) Build quick scan map for UI
+            Map<String, List<String>> scanMap = scanService.buildPackageMap(root);
+
+            // 4) Flash + Session
             redirect.addFlashAttribute("selectionSummary", summary);
-            redirect.addFlashAttribute("workspaceRoot", root);
+            redirect.addFlashAttribute("workspaceRoot", root.toString());
             redirect.addFlashAttribute("scanMap", scanMap);
             redirect.addFlashAttribute("plantumlNames", plantumlNames);
             redirect.addFlashAttribute("codeOnly", codeOnly);
 
             session.setAttribute("selectionSummary", summary);
-            session.setAttribute("workspaceRoot", root);
+            session.setAttribute("workspaceRoot", root.toString());
             session.setAttribute("scanMap", scanMap);
             session.setAttribute("plantumlNames", plantumlNames);
+            session.setAttribute("plantumlFiles", plantumlFiles);
             session.setAttribute("codeOnly", codeOnly);
 
         } catch (IOException e) {
-            model.addAttribute("error", "Failed to save source files: " + e.getMessage());
+            model.addAttribute("error", "Failed to save files: " + e.getMessage());
             return "index";
         }
 
         return "redirect:/select";
-    }
-
-    @GetMapping("/select")
-    public String selectPreview(Model model, HttpSession session) {
-        // Rehydrate core attrs for refresh/direct access
-        copyFromSessionIfMissing("selectionSummary", model, session);
-        copyFromSessionIfMissing("workspaceRoot", model, session);
-        copyFromSessionIfMissing("scanMap", model, session);
-
-        // Plain, template-safe attributes:
-        copyFromSessionIfMissing("plantumlNames", model, session);
-        copyFromSessionIfMissing("codeOnly", model, session);
-
-        return "select";
-    }
-
-    /** Convenience: if the model lacks 'key', copy it from session when present. */
-    private static void copyFromSessionIfMissing(String key, Model model, HttpSession session) {
-        if (model.getAttribute(key) == null) {
-            Object v = session.getAttribute(key);
-            if (v != null) model.addAttribute(key, v);
-        }
     }
 }

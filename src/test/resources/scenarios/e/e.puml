@@ -1,0 +1,9 @@
+@startuml
+class Service
+class Repository
+class Order
+class Temp
+Service -- Order
+Service -- Repository
+Service -- Temp
+@enduml
