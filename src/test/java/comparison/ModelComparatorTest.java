@@ -6,6 +6,7 @@ import comparison.issues.IssueLevel;
 import model.ClassInfo;
 import model.ClassType;
 import model.IntermediateModel;
+import model.ModelSource;
 import model.RelationshipType;
 
 import org.junit.jupiter.api.Test;
@@ -603,6 +604,96 @@ public class ModelComparatorTest {
 		assertEquals("Impl2 -> API2", d.getWhere());
 		assertEquals("REALIZATION", d.getUml());
 		assertEquals("missing", d.getCode());
+	}
+
+	@Test
+	void attributeTypeWrittenDifferent_relaxedPlus_isError() {
+	    // code & uml models
+	    IntermediateModel code = new IntermediateModel(ModelSource.SOURCE_CODE);
+	    IntermediateModel uml  = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
+
+	    // classes
+	    ClassInfo cc = addClass(code, "Invoice", ClassType.CLASS);
+	    ClassInfo uc = addClass(uml,  "Invoice", ClassType.CLASS);
+
+	    // attribute in code vs UML (UML writes a different type)
+	    addAttr(cc, "total", "double", "+");
+	    addAttr(uc, "total", "String", "+");
+
+	    ModelComparator cmp = new ModelComparator(CheckMode.RELAXED_PLUS);
+	    List<Difference> diffs = cmp.compare(code, uml);
+
+	    assertEquals(1, diffs.size());
+	    Difference d = diffs.get(0);
+	    assertEquals(IssueKind.ATTRIBUTE_MISMATCH, d.getKind());
+	    assertEquals(IssueLevel.ERROR, d.getLevel());
+	    // be tolerant to exact formatting of 'where'
+	    assertTrue(d.getWhere().contains("Invoice"));
+	    assertTrue(d.getWhere().toLowerCase().contains("total"));
+	    assertEquals("String", d.getUml());
+	    assertEquals("double", d.getCode());
+	}
+
+	@Test
+	void methodParamsWritten_relaxedPlus_intVsInteger_isError() {
+	    IntermediateModel code = new IntermediateModel(ModelSource.SOURCE_CODE);
+	    IntermediateModel uml  = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
+
+	    ClassInfo c = addClass(code, "UserService", ClassType.CLASS);
+	    ClassInfo u = addClass(uml,  "UserService", ClassType.CLASS);
+
+	    // code: find(int) -> User
+	    addMethod(c, "find", "User", "+", "int");
+	    // UML writes a different signature: find(Integer) -> User
+	    addMethod(u, "find", "User", "+", "Integer");
+
+	    ModelComparator cmp = new ModelComparator(CheckMode.RELAXED_PLUS);
+	    List<Difference> diffs = cmp.compare(code, uml);
+
+	    // Expect two findings:
+	    // 1) UML signature doesn't exist in code (ERROR)
+	    // 2) code overload not drawn in UML (SUGGESTION)
+	    assertEquals(2, diffs.size(), "Expected (ERROR for UML->code mismatch) + (SUGGESTION for code-only overload)");
+
+	    boolean sawMissingInCodeError = false;
+	    boolean sawMissingInUmlSuggestion = false;
+
+	    for (Difference d : diffs) {
+	        if (d.getKind() == IssueKind.METHOD_MISSING_IN_CODE) {
+	            assertEquals(IssueLevel.ERROR, d.getLevel(), "UML-specified signature absent in code should be ERROR");
+	            assertTrue(d.getWhere().startsWith("UserService#find("), "where should reference the find(..) signature");
+	            sawMissingInCodeError = true;
+	        } else if (d.getKind() == IssueKind.METHOD_MISSING_IN_UML) {
+	            assertEquals(IssueLevel.SUGGESTION, d.getLevel(), "code-only method should be SUGGESTION in RELAXED+");
+	            assertTrue(d.getWhere().startsWith("UserService#find("), "where should reference the find(..) signature");
+	            sawMissingInUmlSuggestion = true;
+	        }
+	    }
+
+	    assertTrue(sawMissingInCodeError, "Should include METHOD_MISSING_IN_CODE (ERROR)");
+	    assertTrue(sawMissingInUmlSuggestion, "Should include METHOD_MISSING_IN_UML (SUGGESTION)");
+	}
+
+
+	@Test
+	void publicMethodMissingInUml_relaxedPlus_isSuggestion() {
+	    IntermediateModel code = new IntermediateModel(ModelSource.SOURCE_CODE);
+	    IntermediateModel uml  = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
+
+	    ClassInfo c = addClass(code, "AccountService", ClassType.CLASS);
+	    ClassInfo u = addClass(uml,  "AccountService", ClassType.CLASS);
+
+	    // public no-arg method present only in code
+	    addMethod(c, "export", "String", "+");
+
+	    ModelComparator cmp = new ModelComparator(CheckMode.RELAXED_PLUS);
+	    List<Difference> diffs = cmp.compare(code, uml);
+
+	    assertEquals(1, diffs.size());
+	    Difference d = diffs.get(0);
+	    assertEquals(IssueKind.METHOD_MISSING_IN_UML, d.getKind());
+	    assertEquals(IssueLevel.SUGGESTION, d.getLevel());
+	    assertTrue(d.getWhere().startsWith("AccountService#export("));
 	}
 
 }
