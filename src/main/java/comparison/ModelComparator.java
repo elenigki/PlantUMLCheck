@@ -26,28 +26,31 @@ public class ModelComparator {
     public List<Difference> compare(IntermediateModel code, IntermediateModel uml) {
         List<Difference> out = new ArrayList<>();
 
-        // ---- classes (presence/name/etc). You said this is already implemented as desired.
+        // ---- classes (presence/name/etc)
         out.addAll(ClassCheck.compareClasses(code, uml, mode));
 
-        // collect common class names to run member checks
+        // ---- per-class member checks
         Set<String> common = ClassCheck.commonClassNames(code, uml);
-
         for (String cls : common) {
             ClassInfo cc = ClassCheck.classFrom(code, cls);
             ClassInfo uc = ClassCheck.classFrom(uml, cls);
 
-            if (mode == CheckMode.RELAXED_PLUS) {
-                // RELAXED+ path: use the new, softer member checkers
+            if (mode == CheckMode.RELAXED) {
+                // RELAXED = strict rules for members (exact),
+                // relaxation applies mainly to relationships
+                out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, CheckMode.STRICT));
+                out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, CheckMode.STRICT));
+            } else if (mode == CheckMode.RELAXED_PLUS) {
+                // RELAXED_PLUS = softer on omissions, but written mismatches are errors
                 out.addAll(AttributeCheckPlus.compareAttributesInClass(cls, cc, uc, mode));
                 out.addAll(MethodCheckPlus.compareMethodsInClass(cls, cc, uc, mode));
-            } else {
-                // legacy STRICT/RELAXED behavior (unchanged)
+            } else { // STRICT
                 out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, mode));
                 out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, mode));
             }
         }
 
-        // ---- relationships: always use the existing RelationshipCheck (no PLUS variant)
+        // ---- relationships (shared behavior across modes)
         out.addAll(RelationshipCheck.compareRelationships(code, uml, mode));
 
         return out;

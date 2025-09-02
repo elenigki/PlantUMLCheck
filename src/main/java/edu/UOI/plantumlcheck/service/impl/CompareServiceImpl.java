@@ -54,19 +54,30 @@ public class CompareServiceImpl implements CompareService {
             int umlCount  = (umlModel == null) ? 0 : sizeSafe(umlModel.getClasses());
             int analyzed  = codeCount; // we parsed only selected classes
 
-            // Consistency:
-            // STRICT  -> fail if any diff
-            // RELAXED / RELAXED_PLUS -> fail only if there's at least one ERROR
+            // STRICT / RELAXED / RELAXED_PLUS consistency:
+            // STRICT -> any diff fails
+            // RELAXED -> ERROR fails; otherwise, if there is ANY non-relationship diff (even INFO), fail.
+            // RELAXED_PLUS -> only ERROR fails
             boolean hasErrors = hasLevel(diffs, IssueLevel.ERROR);
+
+            // Partition by relationship vs non-relationship diffs
+            List<Difference> nonRel = new ArrayList<>();
+            List<Difference> relOnly = new ArrayList<>();
+            for (Difference d : diffs) {
+                if (isRelationshipDiff(d)) relOnly.add(d);
+                else nonRel.add(d);
+            }
+
             boolean consistent = sel.codeOnly() ||
                     switch (checkMode) {
                         case STRICT -> diffs.isEmpty();
-                        case RELAXED, RELAXED_PLUS -> !hasErrors;
+                        case RELAXED -> !hasErrors && nonRel.isEmpty();  // relax mainly on relationships
+                        case RELAXED_PLUS -> !hasErrors;                  // pass with warnings
                     };
 
-            // Matches: classes with zero diffs (by tolerant parsing of Difference.where)
+            // Matches: classes with zero *non-relationship* diffs (so relationship-only diffs don't hurt RELAXED)
             Set<String> codeClassNames = classNamesOf(codeModel);
-            Set<String> classesWithDiffs = classNamesMentionedInDiffs(diffs, codeClassNames);
+            Set<String> classesWithDiffs = classNamesMentionedInDiffs(nonRel, codeClassNames);
             int matchCount = Math.max(0, analyzed - classesWithDiffs.size());
 
             int diffCount = diffs.size();
@@ -144,6 +155,11 @@ public class CompareServiceImpl implements CompareService {
     private static int sizeSafe(List<?> list) { return (list == null) ? 0 : list.size(); }
 
     // --- roll-up utilities ---
+
+    private static boolean isRelationshipDiff(Difference d) {
+        if (d == null || d.getKind() == null) return false;
+        return d.getKind().name().startsWith("RELATIONSHIP_");
+    }
 
     private static boolean hasLevel(List<Difference> diffs, IssueLevel lvl) {
         if (diffs == null || diffs.isEmpty()) return false;
