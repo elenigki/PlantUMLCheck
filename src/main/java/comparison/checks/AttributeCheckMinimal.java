@@ -12,23 +12,22 @@ import model.ClassInfo;
 import java.util.*;
 
 /**
- * RELAXED_PLUS attribute comparison:
+ * MINIMAL member rules (formerly RELAXED_PLUS):
  * - Code is the ground truth.
  * - If UML WRITES a detail and it differs => ERROR.
  * - If UML OMITS a detail => SUGGESTION (or INFO for non-API).
  * - Name must match exactly when present (no fuzzy).
  */
-public final class AttributeCheckPlus {
+public final class AttributeCheckMinimal {
 
-    private AttributeCheckPlus() {}
+    private AttributeCheckMinimal() {}
 
-    /** Compare attributes for one class under RELAXED_PLUS rules. */
+    /** Compare attributes for one class under MINIMAL rules. */
     public static List<Difference> compareAttributesInClass(String className,
                                                             ClassInfo codeC,
                                                             ClassInfo umlC,
                                                             CheckMode mode) {
-        if (mode != CheckMode.RELAXED_PLUS) {
-            // Not our mode: let the legacy checkers handle other modes.
+        if (mode != CheckMode.MINIMAL) {
             return List.of();
         }
 
@@ -62,7 +61,7 @@ public final class AttributeCheckPlus {
                     out.add(new Difference(
                             IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.ERROR,
                             where,
-                            "Attribute type differs (RELAXED+ requires exact match when written)",
+                            "Attribute type differs (MINIMAL requires exact match when written)",
                             ut, ct,
                             "Align the UML type to the code type"
                     ));
@@ -77,10 +76,10 @@ public final class AttributeCheckPlus {
                 ));
             }
 
-            // Visibility
+            // Visibility (written vs omitted)
             String uVis = VisibilityRules.vis(U.getVisibility());
             String cVis = VisibilityRules.vis(C.getVisibility());
-            if (!uVis.equals("~")) { // "~" is our normalized default, treat explicit marks as 'written'
+            if (!uVis.equals("~")) {
                 if (!VisibilityRules.equalStrict(uVis, cVis)) {
                     out.add(new Difference(
                             IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.WARNING,
@@ -130,7 +129,7 @@ public final class AttributeCheckPlus {
             if (a == null) continue;
             String n = a.getName();
             if (n == null) continue;
-            m.putIfAbsent(n, a); // first wins
+            m.putIfAbsent(n, a);
         }
         return m;
     }

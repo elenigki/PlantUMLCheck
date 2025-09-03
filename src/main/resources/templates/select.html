@@ -225,10 +225,10 @@
               th:checked="${mode} == 'STRICT'"
             />
             <div>
-              <p class="mode-title">Strict</p>
+              <p class="mode-title">Strict (exact)</p>
               <p class="mode-desc">
-                Match exact signatures, types, visibilities, static/abstract,
-                and relationships.
+                UML must match code exactly (classes, members, and
+                relationships). Any difference is an error.
               </p>
             </div>
           </label>
@@ -240,31 +240,32 @@
               name="mode"
               value="RELAXED"
               form="select-form"
-              th:checked="${mode} == 'RELAXED'"
+              th:checked="${mode} == 'RELAXED' or ${mode} == null"
             />
             <div>
-              <p class="mode-title">Relaxed</p>
+              <p class="mode-title">Relaxed (relationships)</p>
               <p class="mode-desc">
-                Ignore cosmetic differences; relationships must still exist with
-                correct direction/generalization.
+                Classes/members are evaluated like Strict; relationship
+                differences are downgraded to warnings.
               </p>
             </div>
           </label>
 
-          <!-- RELAXED_PLUS (new) -->
+          <!-- MINIMAL -->
           <label class="mode-option">
             <input
               type="radio"
               name="mode"
-              value="RELAXED_PLUS"
+              value="MINIMAL"
               form="select-form"
-              th:checked="${mode} == 'RELAXED_PLUS'"
+              th:checked="${mode} == 'MINIMAL'"
             />
             <div>
-              <p class="mode-title">Relaxed+</p>
+              <p class="mode-title">Minimal (members optional)</p>
               <p class="mode-desc">
-                Relaxed rules plus extra tolerance for attributes/methods
-                (member order + small signature variations).
+                Members may be omitted (suggestions/infos). If written,
+                types/params/return/visibility must match exactly. Relationships
+                behave like Relaxed.
               </p>
             </div>
           </label>

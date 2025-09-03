@@ -37,9 +37,11 @@ public class SelectionController {
             model.addAttribute("scanMap", Map.of());
         }
 
-        // Mode default (RELAXED) if not set yet
+        // Normalize mode for UI: STRICT / RELAXED / MINIMAL (default RELAXED)
         Object m = session.getAttribute("mode");
-        model.addAttribute("mode", (m instanceof String s && !s.isBlank()) ? s : "RELAXED");
+        Mode normalized = toMode((m instanceof String s && !s.isBlank()) ? s : null);
+        model.addAttribute("mode", normalized.name());
+        session.setAttribute("mode", normalized.name());
 
         // codeOnly fallback if not present in model
         if (model.getAttribute("codeOnly") == null) {
@@ -74,7 +76,7 @@ public class SelectionController {
         // Resolve PlantUML file paths (if any) from session (either full paths or just names)
         List<String> plantumlFiles = resolvePlantUmlFiles(session, workspaceRoot);
 
-        // Normalize mode from string (STRICT / RELAXED / RELAXED_PLUS)
+        // Normalize mode from string (STRICT / RELAXED / MINIMAL)
         Mode mode = toMode(modeStr);
 
         // Persist choices to session so refresh/back works
@@ -102,14 +104,19 @@ public class SelectionController {
         return "results";
     }
 
+    /**
+     * Map incoming string to Mode.
+     * Accepts STRICT / RELAXED / MINIMAL (case-insensitive).
+     * Any other/legacy token is treated as MINIMAL (backward compatible, without naming it).
+     */
     private static Mode toMode(String s) {
         if (s == null) return Mode.RELAXED;
-        switch (s.trim().toUpperCase(Locale.ROOT)) {
-            case "STRICT": return Mode.STRICT;
-            case "RELAXED_PLUS": return Mode.RELAXED_PLUS;
-            case "RELAXED":
-            default: return Mode.RELAXED;
-        }
+        String t = s.trim().toUpperCase(Locale.ROOT);
+        if ("STRICT".equals(t))  return Mode.STRICT;
+        if ("RELAXED".equals(t)) return Mode.RELAXED;
+        if ("MINIMAL".equals(t)) return Mode.MINIMAL;
+        // Legacy/unknown tokens (e.g., prior values) => treat as MINIMAL
+        return Mode.MINIMAL;
     }
 
     @SuppressWarnings("unchecked")

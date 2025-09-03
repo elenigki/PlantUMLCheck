@@ -13,21 +13,21 @@ import model.Method;
 import java.util.*;
 
 /**
- * RELAXED_PLUS method comparison:
+ * MINIMAL member rules (formerly RELAXED_PLUS):
  * - If UML WRITES return/params and they differ -> ERROR.
  * - If UML OMITS return/params -> SUGGESTION (and never an error because it’s abstracting).
  * - Name must match exactly when present.
  * - Code-only methods: SUGGESTION for public/protected, INFO otherwise.
  */
-public final class MethodCheckPlus {
+public final class MethodCheckMinimal {
 
-    private MethodCheckPlus() {}
+    private MethodCheckMinimal() {}
 
     public static List<Difference> compareMethodsInClass(String className,
                                                          ClassInfo codeC,
                                                          ClassInfo umlC,
                                                          CheckMode mode) {
-        if (mode != CheckMode.RELAXED_PLUS) {
+        if (mode != CheckMode.MINIMAL) {
             return List.of();
         }
 
@@ -36,12 +36,9 @@ public final class MethodCheckPlus {
         List<Method> codeMethods = codeC == null ? List.of() : safeList(codeC.getMethods());
         List<Method> umlMethods  = umlC  == null ? List.of() : safeList(umlC.getMethods());
 
-        // Build exact-signature maps for quick lookup (name + explicit param types)
         Map<String, Method> codeBySig = bySignature(codeMethods);
         Map<String, Method> umlBySig  = bySignature(umlMethods);
 
-        // Keep track of UML entries that only specify the name (params omitted),
-        // so we don't double-count "missing in UML" for overloads.
         Set<String> umlNameOnly = new LinkedHashSet<>();
         for (Method u : umlMethods) {
             String name = safe(u.getName());
@@ -57,14 +54,12 @@ public final class MethodCheckPlus {
             String name = safe(U.getName());
             List<String> up = U.getParameters();
             String where = className + "#" + (name.isEmpty() ? "—" : SignatureRules.signatureOf(U));
-
-            if (name.isEmpty()) continue; // nothing to validate
+            if (name.isEmpty()) continue;
 
             boolean paramsOmitted = (up == null);
             Method C = null;
 
             if (paramsOmitted) {
-                // Match by NAME ONLY: any code method of that name is acceptable
                 C = firstByName(codeMethods, name);
                 if (C == null) {
                     out.add(new Difference(
@@ -77,7 +72,6 @@ public final class MethodCheckPlus {
                     continue;
                 }
 
-                // Params omitted -> Suggest documenting them
                 out.add(new Difference(
                         IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
                         className + "#" + name + "(…)",
@@ -86,7 +80,6 @@ public final class MethodCheckPlus {
                         "Consider documenting parameter types/arity"
                 ));
 
-                // Return type: if omitted and code is non-void -> SUGGESTION; if void -> OK
                 String uret = ns(U.getReturnType());
                 String cret = ns(C.getReturnType());
                 if (uret.isEmpty()) {
@@ -100,8 +93,6 @@ public final class MethodCheckPlus {
                         ));
                     }
                 } else {
-                    // UML wrote a return: cannot validate against a specific overload reliably;
-                    // keep it advisory, not an error.
                     if (!TypeRules.equalStrict(uret, cret)) {
                         out.add(new Difference(
                                 IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
@@ -113,7 +104,6 @@ public final class MethodCheckPlus {
                     }
                 }
 
-                // Visibility
                 String uVis = VisibilityRules.vis(U.getVisibility());
                 String cVis = VisibilityRules.vis(C.getVisibility());
                 if (!uVis.equals("~")) {
@@ -138,7 +128,6 @@ public final class MethodCheckPlus {
                 continue;
             }
 
-            // Params are WRITTEN: require exact signature match
             String sigU = SignatureRules.signatureOf(U);
             C = codeBySig.get(sigU);
             if (C == null) {
@@ -152,7 +141,6 @@ public final class MethodCheckPlus {
                 continue;
             }
 
-            // Return type WRITTEN: must exactly match
             String uret = ns(U.getReturnType());
             String cret = ns(C.getReturnType());
             if (!uret.isEmpty()) {
@@ -160,7 +148,7 @@ public final class MethodCheckPlus {
                     out.add(new Difference(
                             IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
                             where,
-                            "Return type differs (RELAXED+ requires exact match when written)",
+                            "Return type differs (MINIMAL requires exact match when written)",
                             uret, cret,
                             "Align UML return type to code"
                     ));
@@ -177,7 +165,6 @@ public final class MethodCheckPlus {
                 }
             }
 
-            // Visibility
             String uVis = VisibilityRules.vis(U.getVisibility());
             String cVis = VisibilityRules.vis(C.getVisibility());
             if (!uVis.equals("~")) {
@@ -202,14 +189,12 @@ public final class MethodCheckPlus {
         }
 
         // --- Code -> UML (missing in UML)
-        // If UML had a name-only declaration for a method, do not flag each overload as missing.
         Set<String> matchedExact = umlBySig.keySet();
-
         for (Method C : codeMethods) {
             String sigC = SignatureRules.signatureOf(C);
             String name = safe(C.getName());
             if (matchedExact.contains(sigC)) continue;
-            if (umlNameOnly.contains(name)) continue; // name-level acknowledgement exists
+            if (umlNameOnly.contains(name)) continue;
 
             String vis = VisibilityRules.vis(C.getVisibility());
             IssueLevel lvl = (vis.equals("+") || vis.equals("#")) ? IssueLevel.SUGGESTION : IssueLevel.INFO;
@@ -234,7 +219,7 @@ public final class MethodCheckPlus {
         if (list == null) return m;
         for (Method me : list) {
             if (me == null) continue;
-            String sig = SignatureRules.signatureOf(me); // uses normalized types
+            String sig = SignatureRules.signatureOf(me);
             m.putIfAbsent(sig, me);
         }
         return m;

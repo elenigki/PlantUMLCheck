@@ -5,7 +5,7 @@ import java.util.List;
 
 public interface CompareService {
 
-    enum Mode { STRICT, RELAXED, RELAXED_PLUS }
+    enum Mode { STRICT, RELAXED, MINIMAL } // formerly RELAXED_PLUS
 
     record Selection(
             String workspaceRoot,

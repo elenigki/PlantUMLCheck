@@ -34,15 +34,14 @@ public class CompareServiceImpl implements CompareService {
             IntermediateModel umlModel = null;
             List<Difference> diffs = List.of();
 
-            // Map UI mode -> comparator mode (STRICT / RELAXED / RELAXED_PLUS)
+            // Map UI mode -> comparator mode
             CheckMode checkMode = switch (sel.mode()) {
-                case STRICT -> CheckMode.STRICT;
-                case RELAXED_PLUS -> CheckMode.RELAXED_PLUS;
+                case STRICT  -> CheckMode.STRICT;
                 case RELAXED -> CheckMode.RELAXED;
+                case MINIMAL -> CheckMode.MINIMAL;
             };
 
             if (!sel.codeOnly()) {
-                // Parse PlantUML & compare
                 umlModel = parsePlantUmlFiles(sel.plantumlFiles());
                 notices.addAll(umlModel.getWarnings());
                 ModelComparator cmp = new ModelComparator(checkMode);
@@ -52,41 +51,31 @@ public class CompareServiceImpl implements CompareService {
             // --- Roll-up / Summary ---
             int codeCount = sizeSafe(codeModel.getClasses());
             int umlCount  = (umlModel == null) ? 0 : sizeSafe(umlModel.getClasses());
-            int analyzed  = codeCount; // we parsed only selected classes
+            int analyzed  = codeCount;
 
-            // STRICT / RELAXED / RELAXED_PLUS consistency:
-            // STRICT -> any diff fails
-            // RELAXED -> ERROR fails; otherwise, if there is ANY non-relationship diff (even INFO), fail.
-            // RELAXED_PLUS -> only ERROR fails
             boolean hasErrors = hasLevel(diffs, IssueLevel.ERROR);
 
-            // Partition by relationship vs non-relationship diffs
             List<Difference> nonRel = new ArrayList<>();
-            List<Difference> relOnly = new ArrayList<>();
             for (Difference d : diffs) {
-                if (isRelationshipDiff(d)) relOnly.add(d);
-                else nonRel.add(d);
+                if (!isRelationshipDiff(d)) nonRel.add(d);
             }
 
             boolean consistent = sel.codeOnly() ||
                     switch (checkMode) {
-                        case STRICT -> diffs.isEmpty();
-                        case RELAXED -> !hasErrors && nonRel.isEmpty();  // relax mainly on relationships
-                        case RELAXED_PLUS -> !hasErrors;                  // pass with warnings
+                        case STRICT  -> diffs.isEmpty();
+                        case RELAXED -> !hasErrors && nonRel.isEmpty();
+                        case MINIMAL -> !hasErrors; // pass with warnings
                     };
 
-            // Matches: classes with zero *non-relationship* diffs (so relationship-only diffs don't hurt RELAXED)
             Set<String> codeClassNames = classNamesOf(codeModel);
-            Set<String> classesWithDiffs = classNamesMentionedInDiffs(nonRel, codeClassNames);
-            int matchCount = Math.max(0, analyzed - classesWithDiffs.size());
+            Set<String> classesWithNonRelDiffs = classNamesMentionedInDiffs(nonRel, codeClassNames);
+            int matchCount = Math.max(0, analyzed - classesWithNonRelDiffs.size());
 
             int diffCount = diffs.size();
             Summary sum = new Summary(codeCount, umlCount, analyzed, matchCount, diffCount);
 
-            // Report
             String reportText = ReportPrinter.toText(diffs, checkMode);
 
-            // Generated PlantUML in code-only mode
             String generatedPuml = null;
             if (sel.codeOnly()) {
                 generatedPuml = PlantUmlWriter.generate(checkMode, codeModel, null, List.of());
@@ -106,18 +95,14 @@ public class CompareServiceImpl implements CompareService {
         }
     }
 
-    // --- helpers ---
+    // --- helpers (unchanged) ---
 
     private static IntermediateModel parseSelectedJava(String root, List<String> fqcns) throws IOException {
         JavaSourceParser parser = new JavaSourceParser();
         List<File> files = new ArrayList<>();
-
         for (String fqcn : fqcns) {
-            String rel = fqcn.contains(".")
-                    ? fqcn.replace('.', '/') + ".java"
-                    : fqcn + ".java";
+            String rel = fqcn.contains(".") ? fqcn.replace('.', '/') + ".java" : fqcn + ".java";
             Path p = Paths.get(root).resolve(rel);
-
             if (!Files.exists(p)) {
                 try (var stream = Files.walk(Paths.get(root))) {
                     Optional<Path> hit = stream
@@ -154,8 +139,6 @@ public class CompareServiceImpl implements CompareService {
 
     private static int sizeSafe(List<?> list) { return (list == null) ? 0 : list.size(); }
 
-    // --- roll-up utilities ---
-
     private static boolean isRelationshipDiff(Difference d) {
         if (d == null || d.getKind() == null) return false;
         return d.getKind().name().startsWith("RELATIONSHIP_");
@@ -171,41 +154,24 @@ public class CompareServiceImpl implements CompareService {
 
     private static Set<String> classNamesOf(IntermediateModel model) {
         if (model == null || model.getClasses() == null) return Set.of();
-        return model.getClasses().stream()
-                .map(ClassInfo::getName)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> out = new LinkedHashSet<>();
+        for (ClassInfo c : model.getClasses()) {
+            if (c != null && c.getName() != null) out.add(c.getName());
+        }
+        return out;
     }
 
-    /**
-     * Try to attribute diffs to code classes by parsing Difference.where.
-     * Expected formats include "Class#member", "Class#method(...)".
-     * For relationship diffs which may not start with a class name, this is conservative.
-     */
     private static Set<String> classNamesMentionedInDiffs(List<Difference> diffs, Set<String> knownCodeClasses) {
         Set<String> out = new LinkedHashSet<>();
         if (diffs == null) return out;
-
         for (Difference d : diffs) {
             if (d == null) continue;
             String where = d.getWhere();
             if (where == null) continue;
-
-            String cls = before(where, '#'); // "Class#..."
-            if (cls == null || cls.isBlank()) {
-                // Fallback: sometimes there is no '#'
-                cls = firstToken(where);
-            }
-            if (cls != null && knownCodeClasses.contains(cls)) {
-                out.add(cls);
-            } else {
-                // Relationship diffs might include "A -> B"
-                for (String k : knownCodeClasses) {
-                    if (where.contains(k)) {
-                        out.add(k);
-                    }
-                }
-            }
+            String cls = before(where, '#');
+            if (cls == null || cls.isBlank()) cls = firstToken(where);
+            if (cls != null && knownCodeClasses.contains(cls)) out.add(cls);
+            else for (String k : knownCodeClasses) if (where.contains(k)) out.add(k);
         }
         return out;
     }
@@ -219,9 +185,7 @@ public class CompareServiceImpl implements CompareService {
     private static String firstToken(String s) {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (!Character.isJavaIdentifierPart(c) && c != '.' ) {
-                return s.substring(0, i);
-            }
+            if (!Character.isJavaIdentifierPart(c) && c != '.' ) return s.substring(0, i);
         }
         return s;
     }

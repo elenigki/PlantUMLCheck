@@ -1,10 +1,10 @@
 package comparison;
 
 import comparison.checks.AttributeCheck;
-import comparison.checks.AttributeCheckPlus;
+import comparison.checks.AttributeCheckMinimal;
 import comparison.checks.ClassCheck;
 import comparison.checks.MethodCheck;
-import comparison.checks.MethodCheckPlus;
+import comparison.checks.MethodCheckMinimal;
 import comparison.checks.RelationshipCheck;
 import comparison.issues.Difference;
 import model.ClassInfo;
@@ -17,7 +17,7 @@ import java.util.Set;
 /** Compares code vs UML and collects differences. */
 public class ModelComparator {
 
-    private final CheckMode mode;  // STRICT, RELAXED, RELAXED_PLUS
+    private final CheckMode mode;  // STRICT, RELAXED, MINIMAL
 
     public ModelComparator(CheckMode mode) {
         this.mode = mode;
@@ -35,16 +35,12 @@ public class ModelComparator {
             ClassInfo cc = ClassCheck.classFrom(code, cls);
             ClassInfo uc = ClassCheck.classFrom(uml, cls);
 
-            if (mode == CheckMode.RELAXED) {
-                // RELAXED = strict rules for members (exact),
-                // relaxation applies mainly to relationships
-                out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, CheckMode.STRICT));
-                out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, CheckMode.STRICT));
-            } else if (mode == CheckMode.RELAXED_PLUS) {
-                // RELAXED_PLUS = softer on omissions, but written mismatches are errors
-                out.addAll(AttributeCheckPlus.compareAttributesInClass(cls, cc, uc, mode));
-                out.addAll(MethodCheckPlus.compareMethodsInClass(cls, cc, uc, mode));
-            } else { // STRICT
+            if (mode == CheckMode.MINIMAL) {
+                // MINIMAL (formerly RELAXED_PLUS): omissions allowed; written mismatches are errors
+                out.addAll(AttributeCheckMinimal.compareAttributesInClass(cls, cc, uc, mode));
+                out.addAll(MethodCheckMinimal.compareMethodsInClass(cls, cc, uc, mode));
+            } else {
+                // STRICT and RELAXED use the legacy checkers with their own internal rules
                 out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, mode));
                 out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, mode));
             }
