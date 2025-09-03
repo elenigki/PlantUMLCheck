@@ -386,31 +386,50 @@ public class PlantUMLParser {
 
 	// Handles method declarations with or without visibility and return type.
 	private boolean parseMethod(String line, ClassInfo currentClass) {
-		// Matches: "+ getName() : String", "print()", "getInfo(String, int)"
-		Matcher matcher = Pattern.compile("^([-+#])?\\s*(\\w+)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w<>]+))?$").matcher(line);
-		if (matcher.find()) {
-			String visibility = matcher.group(1);
-			if (visibility == null)
-				visibility = "";
-			String name = matcher.group(2);
-			String params = matcher.group(3);
-			String returnType = matcher.group(4);
-			if (returnType == null)
-				returnType = "void";
+	    // 1) Original style: "+ doThing(int, String) : void"
+	    //    (kept first so existing diagrams keep working)
+	    Matcher m1 = Pattern.compile(
+	        "^([-+#])?\\s*(\\w+)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w<>\\[\\]., ]+))?$"
+	    ).matcher(line);
+	    if (m1.find()) {
+	        String visibility = m1.group(1) == null ? "" : m1.group(1);
+	        String name       = m1.group(2);
+	        String paramsRaw  = m1.group(3);
+	        String returnType = m1.group(4) == null ? "void" : m1.group(4).trim();
 
-			ArrayList<String> paramList = new ArrayList<>();
-			if (!params.isEmpty()) {
-				for (String p : params.split("\\s*,\\s*")) {
-					paramList.add(p.trim());
-				}
-			}
+	        ArrayList<String> paramList = new ArrayList<>();
+	        if (!paramsRaw.isEmpty()) {
+	            for (String p : paramsRaw.split("\\s*,\\s*")) {
+	                paramList.add(p.trim());
+	            }
+	        }
+	        currentClass.addMethod(new Method(name, returnType, paramList, visibility));
+	        return true;
+	    }
 
-			currentClass.addMethod(new Method(name, returnType, paramList, visibility));
-			return true;
-		}
+	    // 2) Java-like style: "+ void service()", "+ List<String> findAll()"
+	    Matcher m2 = Pattern.compile(
+	        "^([-+#])?\\s*([\\w<>\\[\\]., ]+)\\s+(\\w+)\\s*\\((.*?)\\)\\s*;?$"
+	    ).matcher(line);
+	    if (m2.find()) {
+	        String visibility = m2.group(1) == null ? "" : m2.group(1);
+	        String returnType = m2.group(2).trim();
+	        String name       = m2.group(3);
+	        String paramsRaw  = m2.group(4);
 
-		return false;
+	        ArrayList<String> paramList = new ArrayList<>();
+	        if (!paramsRaw.isEmpty()) {
+	            for (String p : paramsRaw.split("\\s*,\\s*")) {
+	                paramList.add(p.trim());
+	            }
+	        }
+	        currentClass.addMethod(new Method(name, returnType, paramList, visibility));
+	        return true;
+	    }
+
+	    return false;
 	}
+
 
 	// Checks if a line contains an explicit UML arrow relationship
 	// Example: "Car *-- Engine", "Library o-- Book"

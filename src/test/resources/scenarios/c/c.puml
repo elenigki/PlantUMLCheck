@@ -1,5 +1,0 @@
-@startuml
-class Team
-class Coach
-Team o-- Coach
-@enduml

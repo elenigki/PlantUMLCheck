@@ -90,6 +90,10 @@ public class JavaSourceParser {
 
 				// Parse attributes and methods from cleaned & structured lines
 				parseAttributes(splitLines, classInfo);
+
+				// NEW: pick up interface abstract signatures like 'void draw();'
+				extractAbstractSignatures(splitLines, classInfo);
+
 				extractMethods(splitLines, classInfo);
 			}
 		}
@@ -305,6 +309,9 @@ public class JavaSourceParser {
 	}
 
 
+	// ==========================
+	// Method extraction patterns
+	// ==========================
 
 	private static final Pattern METHOD_PATTERN = Pattern.compile("^(public|protected|private)?\\s*" + // 1: visibility
 			"(static\\s+)?(final\\s+)?(abstract\\s+)?\\s*" + // 2-4: modifiers
@@ -314,6 +321,17 @@ public class JavaSourceParser {
 
 	private static final Pattern METHOD_HEADER_PATTERN = Pattern
 			.compile("\\b(public|private|protected)\\b.*\\(.*\\)\\s*(\\{)?\\s*$");
+
+	// NEW: very narrow pattern for ';'-terminated abstract/interface signatures
+	private static final Pattern ABSTRACT_SIGNATURE_PATTERN = Pattern.compile(
+			"^\\s*(?:@[\\w.]+\\s*)*" +                     // annotations (optional)
+			"(?:public|protected|private)?\\s*" +          // visibility (optional)
+			"(?:(?:abstract|default|static|strictfp)\\s+)*" + // modifiers (optional)
+			"([\\w\\<\\>\\[\\]\\.,\\s]+)\\s+" +           // (1) return type
+			"(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)\\s*" + // (2) name
+			"\\(([^)]*)\\)\\s*" +                         // (3) params
+			"(?:throws\\s+[\\w\\.,\\s]+)?\\s*;"           // optional throws, then ';'
+	);
 
 
 	// Parses a full method body string into a Method object
@@ -392,6 +410,53 @@ public class JavaSourceParser {
 		}
 
 		return method;
+	}
+
+	// NEW: picks up ';'-terminated interface method signatures (no body)
+	private void extractAbstractSignatures(List<String> lines, ClassInfo classInfo) {
+		// Only consider interface members here to keep pattern scope tight
+		if (classInfo == null || classInfo.getClassType() != ClassType.INTERFACE) {
+			return;
+		}
+
+		for (String raw : lines) {
+			String line = preprocessor.cleanLine(raw);
+
+			// Must end with ';', include '(', and have no '{'
+			if (!line.endsWith(";")) continue;
+			if (!line.contains("(")) continue;
+			if (line.contains("{")) continue;
+
+			// In interfaces, default/static members should have bodies; skip defensively
+			if (line.contains(" default ") || line.contains(" static ")) continue;
+
+			Matcher m = ABSTRACT_SIGNATURE_PATTERN.matcher(line);
+			if (!m.matches()) continue;
+
+			String returnType = normalizeType(m.group(1).trim());
+			String methodName = m.group(2);
+			String params     = Optional.ofNullable(m.group(3)).orElse("").trim();
+
+			// Determine explicit visibility if present; otherwise, interfaces default to public
+			String visKeyword = null;
+			Matcher vm = Pattern.compile("\\b(public|private|protected)\\b").matcher(line);
+			if (vm.find()) visKeyword = vm.group(1);
+			String visibility = visibilitySymbol(visKeyword == null ? "public" : visKeyword);
+
+			System.out.println("[extractAbstractSignatures] match: " + line);
+			System.out.println("[extractAbstractSignatures] name=" + methodName + ", return=" + returnType + ", params=" + params + ", vis=" + visibility);
+
+			// Build method exactly like parseMethod does
+			Method method = new Method(methodName, returnType, visibility);
+
+			// Parameters + relationships consistent with your logic
+			parseParameters(params, method, classInfo, /*isConstructor*/ false);
+
+			// Return type relationships consistent with your logic
+			processReturnType(returnType, classInfo);
+
+			classInfo.addMethod(method);
+		}
 	}
 
 	// checks if method name equals class name

@@ -1,8 +1,0 @@
-@startuml
-class Shape
-class Square
-interface Drawable
-class Painter
-Square --|> Shape
-Painter ..|> Drawable
-@enduml

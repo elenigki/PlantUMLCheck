@@ -1,5 +1,0 @@
-@startuml
-interface Drawable
-class Painter
-Painter --|> Drawable
-@enduml

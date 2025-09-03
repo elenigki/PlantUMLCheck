@@ -1,0 +1,7 @@
+@startuml
+class Service
+class Repository
+class Logger
+Service -- Repository
+Service -- Logger
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+class Customer {
+  - String name
+  - Item item
+  + String getName()
+}
+class Item {
+  - String sku
+  + String getSku()
+}
+class Engine
+
+class Car {
+  - Engine engine
+  + void service()
+}
+interface Drawable {
+  + void draw()
+}
+class Painter {
+  + void draw()
+}
+Customer -- Item
+Car *-- Engine
+Painter ..|> Drawable
+@enduml
