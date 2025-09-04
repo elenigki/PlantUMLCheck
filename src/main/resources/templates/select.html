@@ -197,6 +197,16 @@
         gap: 6px;
         align-items: center;
       }
+      /* When code-only, there’s just one column; center the card */
+      .grid-2.single {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-2.single > .card {
+        width: 100%;
+        max-width: 860px; /* tweak to taste */
+        justify-self: center; /* horizontally center the card */
+      }
     </style>
   </head>
   <body>
@@ -209,7 +219,7 @@
 
     <main class="wrap">
       <!-- MODE SELECTION -->
-      <section class="card mode-card">
+      <section class="card mode-card" th:if="${!codeOnly}">
         <div class="card-header">
           <span class="mode-badge">Mode</span>
           <h2 style="margin: 6px 0 0 0">Comparison Options</h2>
@@ -277,7 +287,7 @@
         <input type="hidden" name="workspaceRoot" th:value="${workspaceRoot}" />
         <input type="hidden" name="codeOnly" th:value="${codeOnly}" />
 
-        <div class="grid-2">
+        <div class="grid-2" th:classappend="${codeOnly} ? ' single' : ''">
           <!-- LEFT: PACKAGES & CLASSES -->
           <section class="card">
             <div class="card-body">
