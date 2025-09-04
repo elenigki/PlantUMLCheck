@@ -91,17 +91,18 @@ public class SelectionController {
                 mode,
                 plantumlFiles
         );
+     // SelectionController.java  (inside @PostMapping("/select/confirm"))
         RunResult result = compareService.run(sel);
 
-        // Store for results page + downloads
+        // Make these the single source of truth for the results page + downloads
         session.setAttribute("lastResult", result);
-        //session.setAttribute("lastReport", result.reportText());   // used later by /results/report.txt
-        session.setAttribute("lastUml", result.generatedPlantUml()); // used later by /results/uml.puml
+        session.setAttribute("lastReportText", result.reportText());      // used by /results/report.txt
+        session.setAttribute("lastGeneratedPuml", result.generatedPlantUml()); // used by /results/uml.puml
 
-        // Put in model for immediate render
-        model.addAttribute("result", result);
+        // No need to put 'result' in the model anymore.
+        // PRG: redirect to the GET endpoint that renders the view.
+        return "redirect:/results";
 
-        return "results";
     }
 
     /**

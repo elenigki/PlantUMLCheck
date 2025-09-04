@@ -7,6 +7,18 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class ResultsController {
+	
+	@GetMapping("/results")
+	public String showResults(HttpSession session, org.springframework.ui.Model model) {
+	    Object result = session.getAttribute("lastResult");
+	    if (result == null) {
+	        // Session expired or user jumped straight here — send them back gracefully
+	        return "redirect:/select";
+	    }
+	    model.addAttribute("result", result);
+	    return "results";
+	}
+
 
     @GetMapping("/results/report.txt")
     public ResponseEntity<String> downloadReport(HttpSession session) {
