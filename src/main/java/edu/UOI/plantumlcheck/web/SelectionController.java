@@ -98,6 +98,9 @@ public class SelectionController {
         session.setAttribute("lastResult", result);
         session.setAttribute("lastReportText", result.reportText());      // used by /results/report.txt
         session.setAttribute("lastGeneratedPuml", result.generatedPlantUml()); // used by /results/uml.puml
+        
+        session.setAttribute("selectedFqcns", selectedFqcns);
+
 
         // No need to put 'result' in the model anymore.
         // PRG: redirect to the GET endpoint that renders the view.

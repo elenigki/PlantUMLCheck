@@ -563,21 +563,36 @@
         </div>
       </section>
 
-      <!-- Generated UML (code-only) -->
-      <section class="card" th:if="${result.codeOnly}">
+      <!-- Generated / Corrected UML -->
+      <section
+        class="card"
+        th:if="${result.codeOnly or generatedPlantUml != null}"
+      >
         <div class="card-body">
-          <h3 style="margin-top: 0">Generated UML</h3>
+          <div class="code-actions top">
+            <button type="button" class="btn pastel" onclick="copyUml()">
+              Copy
+            </button>
+            <a class="btn pastel" th:href="@{/results/uml.puml}"
+              >Export (puml)</a
+            >
+          </div>
+
+          <h3
+            style="margin-top: 0"
+            th:text="${result.codeOnly} ? 'Generated UML' : 'Corrected UML'"
+          >
+            Generated UML
+          </h3>
+
           <div class="codewrap">
-            <pre id="umlText" th:text="${result.generatedPlantUml}">
+            <pre
+              id="umlText"
+              th:text="${generatedPlantUml != null ? generatedPlantUml : result.generatedPlantUml}"
+            >
 @startuml
 @enduml</pre
             >
-          </div>
-          <div class="code-actions">
-            <button type="button" class="btn ghost" onclick="copyUml()">
-              Copy
-            </button>
-            <a class="btn ghost" th:href="@{/results/uml.puml}">Download UML</a>
           </div>
         </div>
       </section>
@@ -588,20 +603,13 @@
         <a class="btn ghost" th:href="@{/results/report.txt}"
           >Export report (txt)</a
         >
-        <a
-          class="btn ghost"
-          th:if="${result.generatedPlantUml != null}"
-          th:href="@{/results/uml.puml}"
-          >Export UML</a
-        >
-        <button
-          class="btn primary"
-          type="button"
-          disabled
-          title="Coming soon: create a corrected UML script based on selected mode"
-        >
+
+        <!-- Rename the button ↓ and keep it as a link (no download) -->
+        <a class="btn primary" th:href="@{/results/generate-corrected}">
           Generate corrected UML
-        </button>
+        </a>
+
+        <!-- DELETE the trailing text node: “Generate corrected UML” -->
       </div>
 
       <div id="toast" class="toast">Copied!</div>

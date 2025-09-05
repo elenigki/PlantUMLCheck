@@ -331,3 +331,22 @@ body {
     outline-offset: 6px;
     box-shadow: 0 10px 24px rgba(99, 102, 241, .2)
 }
+/* Light, tinted buttons for secondary actions */
+.btn.pastel {
+    background: #eef2ff;
+    /* soft indigo tint */
+    color: #2b2f52;
+    border: 1px solid #dfe3ff;
+}
+
+.btn.pastel:hover {
+    background: #e6ebff;
+}
+
+/* Put actions above code block neatly aligned to the right */
+.code-actions.top {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
