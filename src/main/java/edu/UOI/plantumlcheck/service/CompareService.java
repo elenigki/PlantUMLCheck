@@ -7,6 +7,7 @@ public interface CompareService {
 
     enum Mode { STRICT, RELAXED, MINIMAL } // formerly RELAXED_PLUS
 
+    model.IntermediateModel getLastCodeModel();
     record Selection(
             String workspaceRoot,
             List<String> selectedFqcns,

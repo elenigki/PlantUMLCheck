@@ -9,9 +9,13 @@ import comparison.checks.RelationshipCheck;
 import comparison.issues.Difference;
 import model.ClassInfo;
 import model.IntermediateModel;
+import model.Relationship;
+import model.RelationshipType;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Compares code vs UML and collects differences. */
@@ -24,7 +28,8 @@ public class ModelComparator {
     }
 
     public List<Difference> compare(IntermediateModel code, IntermediateModel uml) {
-        List<Difference> out = new ArrayList<>();
+    	
+    	List<Difference> out = new ArrayList<>();
 
         // ---- classes (presence/name/etc)
         out.addAll(ClassCheck.compareClasses(code, uml, mode));

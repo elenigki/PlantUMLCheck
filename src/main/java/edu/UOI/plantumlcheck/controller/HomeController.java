@@ -1,8 +1,8 @@
-package edu.UOI.plantumlcheck.web;
+package edu.UOI.plantumlcheck.controller;
 
+import edu.UOI.plantumlcheck.controller.view.SelectionSummary;
 import edu.UOI.plantumlcheck.service.JavaScanService;
 import edu.UOI.plantumlcheck.service.JavaScanService.Workspace;
-import edu.UOI.plantumlcheck.web.view.SelectionSummary;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;

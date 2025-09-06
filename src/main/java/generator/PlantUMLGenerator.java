@@ -52,6 +52,13 @@ public final class PlantUMLGenerator {
         if (model == null) {
             throw new IllegalArgumentException("model is null");
         }
+        //////
+        Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
+        for (Relationship r : model.getRelationships()) {
+            counts.merge(r.getType(), 1L, Long::sum);
+        }
+        System.out.println("[REL][gen] inputCounts=" + counts);
+        /////
 
         StringBuilder sb = new StringBuilder(8_192);
         sb.append("@startuml").append('\n');
@@ -105,6 +112,9 @@ public final class PlantUMLGenerator {
 
                 String arrow = toArrow(r.getType());
                 if (arrow == null) continue;
+                
+                // DEBUG: show exactly what we’re about to emit
+                System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + r.getType() + ")");
 
                 sb.append(quoteIfNeeded(srcName)).append(' ')
                   .append(arrow).append(' ')

@@ -1,4 +1,4 @@
-package edu.UOI.plantumlcheck.web.view;
+package edu.UOI.plantumlcheck.controller.view;
 
 import java.util.List;
 

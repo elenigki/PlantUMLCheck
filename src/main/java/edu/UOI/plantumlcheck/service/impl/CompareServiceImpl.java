@@ -5,30 +5,33 @@ import comparison.ModelComparator;
 import comparison.issues.Difference;
 import comparison.issues.IssueLevel;
 import comparison.report.ReportPrinter;
-import comparison.export.PlantUmlWriter;
 import edu.UOI.plantumlcheck.service.CompareService;
+import generator.PlantUMLGenerator;
 import model.ClassInfo;
 import model.IntermediateModel;
 import model.ModelSource;
 import model.Relationship;
+import org.springframework.stereotype.Service;
 import parser.code.JavaSourceParser;
 import parser.uml.PlantUMLParser;
-import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class CompareServiceImpl implements CompareService {
 
+    /** Keep the official code-side model from the latest run for reuse (e.g., UML generation). */
+    private IntermediateModel lastCodeModel;
+
     @Override
     public RunResult run(Selection sel) {
         try {
-            // Parse Java (selected classes)
+            // Parse Java (selected classes) → official code model
             IntermediateModel codeModel = parseSelectedJava(sel.workspaceRoot(), sel.selectedFqcns());
+            this.lastCodeModel = codeModel; // <-- expose via getter
             List<String> notices = new ArrayList<>(codeModel.getWarnings());
 
             IntermediateModel umlModel = null;
@@ -76,9 +79,10 @@ public class CompareServiceImpl implements CompareService {
 
             String reportText = ReportPrinter.toText(diffs, checkMode);
 
+            // Generate PlantUML only for code-only runs, straight from the official code model.
             String generatedPuml = null;
             if (sel.codeOnly()) {
-                generatedPuml = PlantUmlWriter.generate(checkMode, codeModel, null, List.of());
+                generatedPuml = new PlantUMLGenerator().generate(codeModel);
             }
 
             return new RunResult(consistent, sel.codeOnly(), sel.mode(), sum, diffs, reportText, generatedPuml, notices);
@@ -95,23 +99,30 @@ public class CompareServiceImpl implements CompareService {
         }
     }
 
+    @Override
+    public IntermediateModel getLastCodeModel() {
+        return lastCodeModel;
+    }
+
     // --- helpers (unchanged) ---
 
     private static IntermediateModel parseSelectedJava(String root, List<String> fqcns) throws IOException {
         JavaSourceParser parser = new JavaSourceParser();
         List<File> files = new ArrayList<>();
-        for (String fqcn : fqcns) {
-            String rel = fqcn.contains(".") ? fqcn.replace('.', '/') + ".java" : fqcn + ".java";
-            Path p = Paths.get(root).resolve(rel);
-            if (!Files.exists(p)) {
-                try (var stream = Files.walk(Paths.get(root))) {
-                    Optional<Path> hit = stream
-                            .filter(pp -> pp.getFileName().toString().equals(simpleName(fqcn) + ".java"))
-                            .findFirst();
-                    if (hit.isPresent()) p = hit.get();
+        if (fqcns != null) {
+            for (String fqcn : fqcns) {
+                String rel = fqcn.contains(".") ? fqcn.replace('.', '/') + ".java" : fqcn + ".java";
+                Path p = Paths.get(root).resolve(rel);
+                if (!Files.exists(p)) {
+                    try (var stream = Files.walk(Paths.get(root))) {
+                        Optional<Path> hit = stream
+                                .filter(pp -> pp.getFileName().toString().equals(simpleName(fqcn) + ".java"))
+                                .findFirst();
+                        if (hit.isPresent()) p = hit.get();
+                    }
                 }
+                if (Files.exists(p)) files.add(p.toFile());
             }
-            if (Files.exists(p)) files.add(p.toFile());
         }
         return parser.parse(files);
     }

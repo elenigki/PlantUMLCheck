@@ -81,10 +81,8 @@ public class JavaSourcePreprocessor {
 			int angles = 0; // <>
 			int braces = 0; // not strictly needed but could help
 
-			System.out.println("\n[joinLogicalLines] --- START ---");
 
 			for (String rawLine : lines) {
-				System.out.println("[joinLogicalLines] Line in: " + rawLine);
 				String line = rawLine.trim();
 				if (line.isEmpty())
 					continue;
@@ -111,7 +109,6 @@ public class JavaSourcePreprocessor {
 
 				if (parens <= 0 && angles <= 0 && isCompleteLine) {
 					String completedLine = current.toString().trim();
-					System.out.println("[joinLogicalLines] → Completed logical line: " + completedLine);
 					result.add(completedLine);
 					current.setLength(0);
 				}
@@ -120,11 +117,9 @@ public class JavaSourcePreprocessor {
 			// Add any remaining line (could be last line or error case)
 			if (current.length() > 0) {
 				String remaining = current.toString().trim();
-				System.out.println("[joinLogicalLines] → Final leftover line: " + remaining);
 				result.add(remaining);
 			}
 
-			System.out.println("[joinLogicalLines] --- END ---\n");
 
 			return result;
 		}
@@ -133,19 +128,15 @@ public class JavaSourcePreprocessor {
 		// separate lines
 		public List<String> splitMultipleStatements(List<String> lines) {
 			List<String> result = new ArrayList<>();
-			System.out.println("\n[splitMultipleStatements] --- START ---");
 			for (String line : lines) {
-				System.out.println("[splitMultipleStatements] Line in: " + line);
 				String[] parts = line.split("(?<=\\})\\s+(?=public|private|protected)");
 				for (String part : parts) {
 					String trimmed = part.trim();
 					if (!trimmed.isEmpty()) {
-						System.out.println("[splitMultipleStatements] → Added: " + trimmed);
 						result.add(trimmed);
 					}
 				}
 			}
-			System.out.println("[splitMultipleStatements] --- END ---\n");
 			return result;
 		}
 }

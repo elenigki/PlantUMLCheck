@@ -46,9 +46,6 @@ public class JavaSourceParser {
 	private void parseFile(File file) throws IOException {
 		List<String> rawLines = preprocessor.readLines(file);
 
-		System.out.println("\n========= RAW LINES from: " + file.getName() + " =========");
-		rawLines.forEach(System.out::println);
-
 		for (int i = 0; i < rawLines.size(); i++) {
 			String line = preprocessor.cleanLine(rawLines.get(i));
 			if (line.isEmpty())
@@ -70,23 +67,14 @@ public class JavaSourceParser {
 					i++;
 				}
 
-				System.out.println("\n--------- BODY LINES ---------");
-				bodyLines.forEach(System.out::println);
-
 				// Step 1: Remove all comments (single-line and multi-line)
 				List<String> noComments = preprocessor.cleanComments(bodyLines);
-				System.out.println("\n--------- AFTER cleanComments ---------");
-				noComments.forEach(System.out::println);
 
 				// Step 2: Join multi-line declarations (e.g. attributes, methods)
 				List<String> logicalLines = preprocessor.joinLogicalLines(noComments);
-				System.out.println("\n--------- AFTER joinLogicalLines ---------");
-				logicalLines.forEach(System.out::println);
 
 				// Step 3: Split any merged statements (e.g. "} public ...")
 				List<String> splitLines = preprocessor.splitMultipleStatements(logicalLines);
-				System.out.println("\n--------- AFTER splitMultipleStatements ---------");
-				splitLines.forEach(System.out::println);
 
 				// Parse attributes and methods from cleaned & structured lines
 				parseAttributes(splitLines, classInfo);
@@ -217,12 +205,10 @@ public class JavaSourceParser {
 	// Returns ClassInfo from model or creates a new one (unless it's a built-in
 	// Java type)
 	private ClassInfo getOrCreateClass(String className) {
-		System.out.println("[getOrCreateClass] Input name: " + className);
 
 		String cleaned = stripGenerics(className);
 		// Ignore built-in Java types
 		if (isJavaBuiltInType(cleaned)) {
-			System.out.println("[getOrCreateClass] Skipping built-in type: " + cleaned);
 			return null;
 		}
 
@@ -270,27 +256,20 @@ public class JavaSourceParser {
 			line = preprocessor.cleanLine(line);
 			if (isAttributeDeclaration(line)) {
 				Attribute attr = parseAttribute(line);
-				System.out.println("[parseAttributes] → line: " + line);
-				System.out.println("[parseAttributes] → parsed type: " + attr.getType() + ", name: " + attr.getName());
-
 				if (attr != null) {
 					classInfo.addAttribute(attr);
 
 					Set<String> types = extractGenericTypes(attr.getType());
-					System.out.println("[parseAttributes] → extracted generic types: " + types);
 
 					boolean isMainComposed = isComposedAttribute(line, attr.getType());
 					String declared = attr.getType();
 
 					for (String type : types) {
-						System.out.println("[parseAttributes] → examining type: " + type);
-						System.out.println("[parseAttributes] → declared type string: " + declared);
 						if (type == null || type.isBlank())
 							continue;
 						String cleaned = stripGenerics(type);
 
 						if (!isJavaBuiltInType(cleaned)) {
-							System.out.println("[parseAttributes] → creating/using class: " + cleaned);
 							ClassInfo target = getOrCreateClass(cleaned);
 							if (target != null) {
 								boolean isInComposedStructure = isMainComposed && declared.contains(cleaned);
@@ -360,13 +339,11 @@ public class JavaSourceParser {
 		}
 
 		String headerLine = headerBuilder.toString().trim();
-		System.out.println("[parseMethod] Header line: " + headerLine);
 
 		// Match method signature
 		Matcher matcher = METHOD_PATTERN.matcher(headerLine);
 		if (!matcher.find()) {
 			if (!matcher.find()) {
-				System.out.println("[parseMethod] No match for header pattern.");
 				return null;
 			}
 			return null;
@@ -377,10 +354,6 @@ public class JavaSourceParser {
 		String methodName = matcher.group(6); // method name
 		String paramList = matcher.group(7); // parameters inside (...)
 
-		System.out.println("[parseMethod] Name: " + methodName);
-		System.out.println("[parseMethod] Return type: " + returnType);
-		System.out.println("[parseMethod] Parameters raw: " + paramList);
-
 		boolean isConstructor = isConstructor(methodName, classInfo);
 		String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
 
@@ -388,12 +361,10 @@ public class JavaSourceParser {
 
 		// Parse and track parameter types
 		Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
-		System.out.println("[parseMethod] Parameters extracted (name → type): " + paramNamesAndTypes);
 
 		// Add dependency from return type (if not constructor)
 		if (!isConstructor) {
 			if (!isConstructor) {
-				System.out.println("[parseMethod] → Processing return type: " + returnType);
 			}
 
 			processReturnType(returnType, classInfo);
@@ -404,8 +375,6 @@ public class JavaSourceParser {
 
 		// Add method to class (constructors are excluded)
 		if (!isConstructor) {
-			System.out.println("[parseMethod] → Method added to class: " + method.getName());
-
 			classInfo.addMethod(method);
 		}
 
@@ -442,9 +411,6 @@ public class JavaSourceParser {
 			Matcher vm = Pattern.compile("\\b(public|private|protected)\\b").matcher(line);
 			if (vm.find()) visKeyword = vm.group(1);
 			String visibility = visibilitySymbol(visKeyword == null ? "public" : visKeyword);
-
-			System.out.println("[extractAbstractSignatures] match: " + line);
-			System.out.println("[extractAbstractSignatures] name=" + methodName + ", return=" + returnType + ", params=" + params + ", vis=" + visibility);
 
 			// Build method exactly like parseMethod does
 			Method method = new Method(methodName, returnType, visibility);
@@ -492,9 +458,6 @@ public class JavaSourceParser {
 					if (!isConstructor && !isJavaBuiltInType(cleaned)) {
 						ClassInfo dependency = getOrCreateClass(cleaned);
 						if (dependency != null) {
-							System.out.println("[parseParameters] Raw param: " + param);
-							System.out.println("[parseParameters] → type: " + type + ", name: " + name);
-							System.out.println("[parseParameters] → inner: " + inner + ", cleaned: " + cleaned);
 
 							model.addRelationship(new Relationship(classInfo, dependency, RelationshipType.ASSOCIATION));
 						}
@@ -502,7 +465,6 @@ public class JavaSourceParser {
 
 					// For constructors, still ensure class exists (as dummy if needed)
 					if (isConstructor && !isJavaBuiltInType(cleaned)) {
-						System.out.println("[parseParameters] → creating/using class: " + cleaned);
 
 						getOrCreateClass(cleaned);
 					}
@@ -514,18 +476,15 @@ public class JavaSourceParser {
 	}
 
 	private void processReturnType(String returnType, ClassInfo classInfo) {
-		System.out.println("[processReturnType] Raw returnType: " + returnType);
 
 		if (returnType == null || returnType.equals("void"))
 			return;
 
 		Set<String> returnTypes = extractGenericTypesFromTypeSignature(returnType);
-		System.out.println("[processReturnType] → extracted types: " + returnTypes);
 
 		for (String type : returnTypes) {
 
 			if (!isJavaBuiltInType(type)) {
-				System.out.println("[processReturnType] → creating/using class: " + type);
 
 				ClassInfo dependency = getOrCreateClass(type);
 				if (dependency != null) {
@@ -605,7 +564,6 @@ public class JavaSourceParser {
 		StringBuilder methodBuffer = new StringBuilder();
 
 		for (String line : lines) {
-			System.out.println("[extractMethods] Line: " + line);
 
 			if (!insideMethod) {
 
@@ -613,7 +571,6 @@ public class JavaSourceParser {
 					// Look for start of method signature (must include a visibility keyword and "("
 					// )
 					if (METHOD_HEADER_PATTERN.matcher(line).matches()) {
-						System.out.println("[extractMethods] → Start collecting method header: " + line);
 
 						headerBuffer.setLength(0);
 						headerBuffer.append(line).append(" ");
@@ -632,7 +589,6 @@ public class JavaSourceParser {
 							}
 
 							if (openBraces == 0) {
-								System.out.println("[extractMethods] → Passing to parseMethod(...)");
 
 								parseMethod(methodBuffer.toString(), currentClass);
 								insideMethod = false;
@@ -642,12 +598,10 @@ public class JavaSourceParser {
 						}
 					}
 				} else {
-					System.out.println("[extractMethods] → Continuing header: " + line);
+					
 
 					headerBuffer.append(line).append(" ");
 					if (line.contains(")")) {
-						System.out.println("[extractMethods] → Method signature complete:");
-						System.out.println(headerBuffer.toString().trim());
 
 						collectingHeader = false;
 						insideMethod = true;
@@ -660,7 +614,6 @@ public class JavaSourceParser {
 						}
 
 						if (openBraces == 0) {
-							System.out.println("[extractMethods] → Passing to parseMethod(...)");
 							parseMethod(methodBuffer.toString(), currentClass);
 							insideMethod = false;
 
@@ -668,13 +621,10 @@ public class JavaSourceParser {
 					}
 				}
 			} else {
-				System.out.println("[extractMethods] → Inside method body line: " + line);
 				methodBuffer.append(line).append("\n");
 				openBraces += countOccurrences(line, '{') - countOccurrences(line, '}');
 
 				if (openBraces <= 0) {
-					System.out.println("[extractMethods] → Full method block:");
-					System.out.println(methodBuffer.toString());
 
 					parseMethod(methodBuffer.toString(), currentClass);
 					insideMethod = false;
@@ -726,16 +676,13 @@ public class JavaSourceParser {
 		boolean isSetter = methodName.startsWith("set") && paramNamesAndTypes.size() == 1;
 
 		if (!(isConstructor || isSetter)) {
-			System.out.println("not a Constrructor/Setter: " + methodName);
 			return;
 		}
 
-		System.out.println("[aggregation] Total parameters: " + paramNamesAndTypes.size());
 
 		for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
 			String paramName = param.getKey();
 			String paramType = param.getValue();
-			System.out.println("[aggregation] paramName: '" + paramName + "' , paramType: '" + paramType + "'");
 
 // Extract all relevant types from the parameter type (e.g., List<Book> → [List, Book])
 			Set<String> types = extractGenericTypes(paramType);
@@ -745,7 +692,6 @@ public class JavaSourceParser {
 
 // Skip Java built-in types like List, Map, etc.
 				if (isJavaBuiltInType(cleaned)) {
-					System.out.println("[aggregation] Skipping built-in type: " + cleaned);
 					continue;
 				}
 
@@ -753,27 +699,16 @@ public class JavaSourceParser {
 				String patternString = "\\bthis\\.[a-zA-Z0-9_]+\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;";
 				String normalizedBody = methodBody.replaceAll("\\s+", " ");
 
-				System.out.println("[aggregation] normalizedBody: " + normalizedBody);
-				System.out.println("[aggregation] pattern: " + patternString);
-				System.out.println("[aggregation] READY TO MATCH param: " + paramName);
-
 				Matcher matcher = Pattern.compile(patternString).matcher(normalizedBody);
 
 				if (matcher.find()) {
-					System.out.println("[aggregation] MATCH FOUND for param: " + paramName);
 					ClassInfo target = getOrCreateClass(cleaned);
 					if (target != null) {
 						Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
 						model.addRelationship(rel);
 					}
 				} else {
-					System.out.println("[aggregation] NO MATCH for param: " + paramName);
 				}
-
-				System.out.println("[aggregation] methodName: " + methodName);
-				System.out.println("[aggregation] parameters passed in map: " + paramNamesAndTypes);
-				System.out.println("[aggregation] paramType: '" + paramType + "'");
-				System.out.println("[aggregation] methodBody:\n" + methodBody);
 			}
 		}
 	}
