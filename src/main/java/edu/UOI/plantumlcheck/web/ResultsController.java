@@ -1,9 +1,12 @@
 package edu.UOI.plantumlcheck.web;
 
-//keep your existing: package ...;
+import edu.UOI.plantumlcheck.service.CompareService;
+import edu.UOI.plantumlcheck.service.CompareService.Mode;
+import edu.UOI.plantumlcheck.service.CompareService.Selection;
+import edu.UOI.plantumlcheck.service.CompareService.RunResult;
 
 import jakarta.servlet.http.HttpSession;
-import model.IntermediateModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,38 +14,40 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import generator.PlantUMLGenerator;
-import parser.code.JavaSourceParser;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Controller
 public class ResultsController {
+
+	@Autowired
+	private CompareService compareService;
 
 	/** Results page */
 	@GetMapping("/results")
 	public String showResults(HttpSession session, Model model) {
 		Object result = session.getAttribute("lastResult");
-		if (result == null) {
+		if (result == null)
 			return "redirect:/select";
-		}
 		model.addAttribute("result", result);
 
-		// Expose generated/corrected UML (if any) to the template
+		// If code-only and we don't yet have a script, generate it via the SAME service
+		// pipeline
+		Boolean codeOnly = (Boolean) session.getAttribute("codeOnly");
 		String puml = (String) session.getAttribute("lastGeneratedPuml");
-		if (puml != null) {
-			model.addAttribute("generatedPlantUml", puml);
+		if (Boolean.TRUE.equals(codeOnly) && (puml == null || puml.isBlank())) {
+			puml = generateViaService(session);
+			if (puml != null)
+				session.setAttribute("lastGeneratedPuml", puml);
 		}
+
+		if (puml != null)
+			model.addAttribute("generatedPlantUml", puml);
 		return "results";
 	}
 
-	/** Export the comparison report as txt (already used by your page) */
+	/** Export the comparison report as txt */
 	@GetMapping("/results/report.txt")
 	public ResponseEntity<String> downloadReport(HttpSession session) {
 		String txt = (String) session.getAttribute("lastReportText");
@@ -52,7 +57,7 @@ public class ResultsController {
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report.txt").body(txt);
 	}
 
-	/** Export the last generated/corrected PlantUML (used by the Export button) */
+	/** Export the last generated/corrected PlantUML */
 	@GetMapping("/results/uml.puml")
 	public ResponseEntity<String> downloadUml(HttpSession session) {
 		String puml = (String) session.getAttribute("lastGeneratedPuml");
@@ -63,99 +68,65 @@ public class ResultsController {
 	}
 
 	/**
-	 * Generate corrected UML (view-only): build from code model, strip prologue,
-	 * stash to session, and return to /results so the page shows it inline.
+	 * Comparison mode: generate corrected UML and show it inline. Uses EXACTLY the
+	 * same pipeline as code-only by running CompareService with codeOnly=true.
 	 */
 	@GetMapping("/results/generate-corrected")
 	public String generateCorrectedAndShow(HttpSession session) {
-		try {
-			// Prefer a stashed code model if you later store it under "codeModel"
-			IntermediateModel model = null;
-			Object maybe = session.getAttribute("codeModel");
-			if (maybe instanceof IntermediateModel) {
-				model = (IntermediateModel) maybe;
-			}
-
-			// Otherwise rebuild from user's selection under the workspace
-			if (model == null) {
-				String workspaceRoot = (String) session.getAttribute("workspaceRoot");
-				@SuppressWarnings("unchecked")
-				List<String> selectedFqcns = (List<String>) session.getAttribute("selectedFqcns");
-				if (workspaceRoot == null)
-					return "redirect:/select";
-
-				List<File> files = resolveSelectedJavaFiles(workspaceRoot, selectedFqcns);
-				if (files.isEmpty())
-					return "redirect:/select";
-
-				JavaSourceParser parser = new JavaSourceParser();
-				model = parser.parse(files);
-			}
-
-			String uml = new PlantUMLGenerator().generate(model);
-			String cleaned = stripPrologue(uml);
-
-			session.setAttribute("lastGeneratedPuml", cleaned);
-			return "redirect:/results";
-
-		} catch (IOException e) {
-			// On parser IO error, return to results; user can retry
-			return "redirect:/results";
+		String puml = generateViaService(session);
+		if (puml != null) {
+			session.setAttribute("lastGeneratedPuml", puml);
 		}
+		return "redirect:/results";
 	}
 
-	/** Remove comments + skinparams + 'hide empty members' from the top */
-	private static String stripPrologue(String uml) {
-		// Keep @startuml/@enduml and any real content; drop comment lines and style
-		// lines.
-		return Arrays.stream(uml.split("\\R")).filter(line -> {
-			String t = line.trim();
-			if (t.startsWith("'"))
-				return false; // drop comment lines (')
-			if (t.startsWith("skinparam"))
-				return false; // drop skinparam lines
-			if (t.equalsIgnoreCase("hide empty members"))
-				return false;
-			return true;
-		}).collect(Collectors.joining("\n"));
+	// ---------- helper ----------
+
+	/**
+	 * Run the SAME pipeline the app uses for code-only:
+	 * CompareService.run(Selection with codeOnly=true) This guarantees identical
+	 * PlantUML output (formatting, ordering, options).
+	 */
+	@SuppressWarnings("unchecked")
+	private String generateViaService(HttpSession session) {
+		String workspaceRoot = (String) session.getAttribute("workspaceRoot");
+		if (workspaceRoot == null || workspaceRoot.isBlank())
+			return null;
+
+		List<String> selectedFqcns = (List<String>) session.getAttribute("selectedFqcns");
+		if (selectedFqcns == null)
+			selectedFqcns = List.of();
+
+		// Mode is ignored in code-only, but we pass something consistent
+		String modeStr = (String) session.getAttribute("mode");
+		Mode mode = toMode(modeStr);
+
+		// PlantUML inputs are irrelevant for code-only
+		List<String> plantumlFiles = new ArrayList<>();
+
+		Selection sel = new Selection(workspaceRoot, selectedFqcns, true, // << codeOnly
+				mode, plantumlFiles);
+
+		RunResult rr = compareService.run(sel);
+		if (rr == null)
+			return null;
+
+		// Put fresh 'result' back into session only if you want to refresh summary too;
+		// otherwise, just stash the UML.
+		// session.setAttribute("lastResult", rr);
+
+		return rr.generatedPlantUml();
 	}
 
-	/** Resolve .java files for the selected FQCNs; fall back to filename match */
-	private static List<File> resolveSelectedJavaFiles(String workspaceRoot, List<String> selectedFqcns)
-			throws IOException {
-		Path root = Paths.get(workspaceRoot);
-		if (!Files.isDirectory(root))
-			return List.of();
-
-		// If selection is missing, parse everything under the workspace
-		if (selectedFqcns == null || selectedFqcns.isEmpty()) {
-			try (var stream = Files.walk(root)) {
-				return stream.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(".java"))
-						.map(Path::toFile).collect(Collectors.toList());
-			}
-		}
-
-		// Index by filename for fallback
-		Map<String, Path> byFileName = new HashMap<>();
-		try (var stream = Files.walk(root)) {
-			stream.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(".java"))
-					.forEach(p -> byFileName.putIfAbsent(p.getFileName().toString(), p));
-		}
-
-		List<File> out = new ArrayList<>();
-		for (String fqcn : selectedFqcns) {
-			String rel = fqcn.replace('.', File.separatorChar) + ".java";
-			Path expected = root.resolve(rel);
-			if (Files.isRegularFile(expected)) {
-				out.add(expected.toFile());
-				continue;
-			}
-			String simple = fqcn.contains(".") ? fqcn.substring(fqcn.lastIndexOf('.') + 1) : fqcn;
-			Path byName = byFileName.get(simple + ".java");
-			if (byName != null)
-				out.add(byName.toFile());
-		}
-		return out;
+	private static Mode toMode(String s) {
+		if (s == null)
+			return Mode.RELAXED;
+		String t = s.trim().toUpperCase(Locale.ROOT);
+		return switch (t) {
+		case "STRICT" -> Mode.STRICT;
+		case "RELAXED" -> Mode.RELAXED;
+		case "MINIMAL" -> Mode.MINIMAL;
+		default -> Mode.MINIMAL;
+		};
 	}
-
 }

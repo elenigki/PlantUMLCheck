@@ -95,9 +95,9 @@
         gap: 20px;
         align-items: stretch;
       }
-      .panel {
-        display: flex;
-        height: 100%;
+      .panel > * {
+        flex: 1 1 100%;
+        min-width: 0;
       }
       @media (max-width: 900px) {
         .summary {
@@ -305,6 +305,11 @@
         z-index: 6;
         box-shadow: 0 -8px 22px rgba(17, 24, 39, 0.06);
       }
+      /* When code-only leaves a single Back button, keep it centered */
+      .actions-bar.solo {
+        justify-content: center;
+      }
+
       .btn {
         border: none;
         border-radius: 12px;
@@ -373,23 +378,25 @@
       >
         <h1
           class="headline"
-          th:text="${result.consistent} ? 'UML check PASSED' : 'UML check FAILED'"
+          th:text="${result.codeOnly} ? 'Java parsed' : (${result.consistent} ? 'UML check PASSED' : 'UML check FAILED')"
         >
           UML check PASSED
         </h1>
 
-        <!-- Consistency badge -->
+        <!-- Consistency badge (comparison only) -->
         <span
           class="badge"
+          th:if="${!result.codeOnly}"
           th:classappend="${result.consistent} ? ' badge-success' : ' badge-danger'"
           th:text="${result.consistent} ? 'Consistent' : 'Not consistent'"
         >
           Consistent
         </span>
 
-        <!-- Mode badge (friendly label) -->
+        <!-- Mode badge (comparison only) -->
         <span
           class="badge badge-secondary"
+          th:if="${!result.codeOnly}"
           th:text="${result.modeUsed.name() == 'STRICT'  ? 'Strict (exact)' :
                         result.modeUsed.name() == 'RELAXED' ? 'Relaxed (relationships)' :
                                                               'Minimal (members optional)'}"
@@ -402,7 +409,11 @@
           >Code-only</span
         >
       </div>
-      <p class="app-subtitle muted" style="margin-top: 6px">
+      <p
+        class="app-subtitle muted"
+        style="margin-top: 6px"
+        th:text="${result.codeOnly} ? 'Generated PlantUML from selected Java sources' : 'Detailed report and differences below'"
+      >
         Detailed report and differences below
       </p>
     </header>
@@ -415,22 +426,23 @@
           <div class="panel">
             <div
               class="status-banner"
-              th:classappend="${result.consistent} ? ' ok' : ' bad'"
+              th:classappend="${result.codeOnly or result.consistent} ? ' ok' : ' bad'"
             >
               <div
                 class="status-icon"
-                th:text="${result.consistent} ? '✓' : '!'"
+                th:text="${result.codeOnly or result.consistent} ? '✓' : '!'"
               >
                 ✓
               </div>
               <div>
                 <h3
                   class="status-title"
-                  th:text="${result.consistent} ? 'UML check PASSED' : 'UML check FAILED'"
+                  th:text="${result.codeOnly} ? 'Java parsed' : (${result.consistent} ? 'UML check PASSED' : 'UML check FAILED')"
                 >
                   UML check PASSED
                 </h3>
-                <div class="status-sub">
+                <!-- Hide chips in code-only -->
+                <div class="status-sub" th:if="${!result.codeOnly}">
                   <span class="pill info">Java parsed ✓</span>
                   <span class="pill info" th:if="${!result.codeOnly}"
                     >PlantUML parsed ✓</span
@@ -466,6 +478,7 @@
                   </li>
                   <li
                     style="margin-top: 6px"
+                    th:if="${!result.codeOnly}"
                     th:text="'Matches: ' + ${result.summary.matches} + ' · Differences: ' + ${result.summary.differences}"
                   >
                     Matches: 0 · Differences: 0
@@ -598,18 +611,29 @@
       </section>
 
       <!-- Sticky actions -->
-      <div class="actions-bar">
+      <div
+        class="actions-bar"
+        th:classappend="${result.codeOnly} ? ' solo' : ''"
+      >
         <a class="btn lavender" th:href="@{/select}">Back to selection</a>
-        <a class="btn ghost" th:href="@{/results/report.txt}"
-          >Export report (txt)</a
-        >
 
-        <!-- Rename the button ↓ and keep it as a link (no download) -->
-        <a class="btn primary" th:href="@{/results/generate-corrected}">
-          Generate corrected UML
+        <!-- Hide Export report in code-only -->
+        <a
+          class="btn ghost"
+          th:if="${!result.codeOnly}"
+          th:href="@{/results/report.txt}"
+        >
+          Export report (txt)
         </a>
 
-        <!-- DELETE the trailing text node: “Generate corrected UML” -->
+        <!-- Only for comparison flow -->
+        <a
+          class="btn primary"
+          th:if="${!result.codeOnly}"
+          th:href="@{/results/generate-corrected}"
+        >
+          Generate corrected UML
+        </a>
       </div>
 
       <div id="toast" class="toast">Copied!</div>
