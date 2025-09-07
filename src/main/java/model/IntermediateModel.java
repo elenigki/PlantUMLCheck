@@ -61,4 +61,14 @@ public class IntermediateModel {
         return warnings;
     }
 
+
+	public void setRelationships(ArrayList<Relationship> relationships) {
+		this.relationships = relationships;
+	}
+
+
+	public void setClasses(ArrayList<ClassInfo> classes) {
+		this.classes = classes;
+	}
+
 }
