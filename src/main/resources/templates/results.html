@@ -36,6 +36,11 @@
         --pri-a: #14b8a6;
         --pri-b: #0ea5a3;
         --pri-h: #0d9488;
+		
+		--home-a: #60a5fa;  /* blue-400 */
+		--home-b: #3b82f6;  /* blue-500 */
+		--home-h: #2563eb;  /* blue-600 */
+
       }
 
       .wrap {
@@ -350,6 +355,15 @@
         cursor: not-allowed;
         transform: none;
       }
+	  
+	  .btn.home {
+		background: linear-gradient(135deg, var(--home-a), var(--home-b));
+		color: #fff;
+		}
+	.btn.home:hover {
+		background: linear-gradient(135deg, var(--home-b), var(--home-h));
+		}
+
 
       .toast {
         position: fixed;
@@ -610,31 +624,24 @@
         </div>
       </section>
 
-      <!-- Sticky actions -->
-      <div
-        class="actions-bar"
-        th:classappend="${result.codeOnly} ? ' solo' : ''"
-      >
-        <a class="btn lavender" th:href="@{/select}">Back to selection</a>
+<!-- Sticky actions -->
+<div class="actions-bar" th:classappend="${result.codeOnly} ? ' solo' : ''">
+  <a class="btn lavender" th:href="@{/select}">Back to selection</a>
 
-        <!-- Hide Export report in code-only -->
-        <a
-          class="btn ghost"
-          th:if="${!result.codeOnly}"
-          th:href="@{/results/report.txt}"
-        >
-          Export report (txt)
-        </a>
+  <a class="btn ghost" th:if="${!result.codeOnly}" th:href="@{/results/report.txt}">
+    Export report (txt)
+  </a>
 
-        <!-- Only for comparison flow -->
-        <a
-          class="btn primary"
-          th:if="${!result.codeOnly}"
-          th:href="@{/results/generate-corrected}"
-        >
-          Generate corrected UML
-        </a>
-      </div>
+  <a class="btn primary" th:if="${!result.codeOnly}" th:href="@{/results/generate-corrected}">
+    Generate corrected UML
+  </a>
+
+  <!-- NEW: always visible -->
+  <a class="btn home" th:href="@{/}" aria-label="Go to homepage and start a new check">
+    New check
+  </a>
+</div>
+
 
       <div id="toast" class="toast">Copied!</div>
     </main>

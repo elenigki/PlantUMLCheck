@@ -1,3 +1,5 @@
+package scenario01;
+
 public class Customer {
     private String name;
     private Item item;
