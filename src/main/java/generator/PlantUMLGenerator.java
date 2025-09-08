@@ -52,73 +52,94 @@ public final class PlantUMLGenerator {
 
 	/** Main entry point. */
 	public String generate(IntermediateModel originalModel) {
-		if (originalModel == null) {
-			throw new IllegalArgumentException("model is null");
-		}
-		IntermediateModel model = withNormalizedRelationships(originalModel);
-		//////
-		Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
-		for (Relationship r : model.getRelationships()) {
-			counts.merge(r.getType(), 1L, Long::sum);
-		}
-		System.out.println("[REL][gen] inputCounts=" + counts);
-		/////
+	    if (originalModel == null) {
+	        throw new IllegalArgumentException("model is null");
+	    }
 
-		StringBuilder sb = new StringBuilder(8_192);
-		sb.append("@startuml").append('\n');
+	    IntermediateModel model = withNormalizedRelationships(originalModel);
 
-		// Select classes to include.
-		List<ClassInfo> all = safeList(modelGetClasses(model));
-		List<ClassInfo> included = all.stream()
-				.filter(ci -> !options.onlyOfficialClasses || ci.getDeclaration() == ClassDeclaration.OFFICIAL)
-				.sorted(Comparator.comparing(PlantUMLGenerator::safeClassName, String.CASE_INSENSITIVE_ORDER))
-				.collect(Collectors.toList());
+	    // DEBUG: counts
+	    Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
+	    for (Relationship r : model.getRelationships()) {
+	        counts.merge(r.getType(), 1L, Long::sum);
+	    }
+	    System.out.println("[REL][gen] inputCounts=" + counts);
 
-		// Emit class/interface/enum blocks
-		for (ClassInfo ci : included) {
-			emitTypeBlock(sb, ci);
-		}
+	    StringBuilder sb = new StringBuilder(8_192);
+	    sb.append("@startuml").append('\n');
 
-		// Emit relationships
-		List<Relationship> rels = safeList(modelGetRelationships(model));
-		if (!rels.isEmpty()) {
-			// Create a set of included names for pruning
-			Set<String> includedNames = included.stream().map(PlantUMLGenerator::safeClassName)
-					.collect(Collectors.toCollection(LinkedHashSet::new));
+	    // Select classes to include.
+	    List<ClassInfo> all = safeList(modelGetClasses(model));
+	    List<ClassInfo> included = all.stream()
+	            .filter(ci -> !options.onlyOfficialClasses || ci.getDeclaration() == ClassDeclaration.OFFICIAL)
+	            .sorted(Comparator.comparing(PlantUMLGenerator::safeClassName, String.CASE_INSENSITIVE_ORDER))
+	            .collect(Collectors.toList());
 
-			// Sort deterministically
-			rels.sort(Comparator.comparing((Relationship r) -> safeClassName(safeSource(r)))
-					.thenComparing(r -> safeClassName(safeTarget(r))).thenComparing(r -> r.getType().name()));
+	    // Emit class/interface/enum blocks
+	    for (ClassInfo ci : included) {
+	        emitTypeBlock(sb, ci);
+	    }
 
-			for (Relationship r : rels) {
-				ClassInfo src = safeSource(r);
-				ClassInfo dst = safeTarget(r);
-				if (src == null || dst == null)
-					continue;
-				String srcName = safeClassName(src);
-				String dstName = safeClassName(dst);
+	    // Emit relationships
+	    List<Relationship> rels = safeList(modelGetRelationships(model));
+	    if (!rels.isEmpty()) {
+	        // Create a set of included names for pruning
+	        Set<String> includedNames = included.stream()
+	                .map(PlantUMLGenerator::safeClassName)
+	                .collect(Collectors.toCollection(LinkedHashSet::new));
 
-				if (options.pruneDanglingRelationships) {
-					if (!includedNames.contains(srcName) || !includedNames.contains(dstName)) {
-						continue; // skip relationships to filtered classes (e.g., DUMMY)
-					}
-				}
+	        // Sort deterministically
+	        rels.sort(Comparator.comparing((Relationship r) -> safeClassName(safeSource(r)))
+	                .thenComparing(r -> safeClassName(safeTarget(r)))
+	                .thenComparing(r -> r.getType().name()));
 
-				String arrow = toArrow(r.getType());
-				if (arrow == null)
-					continue;
+	        for (Relationship r : rels) {
+	            ClassInfo src = safeSource(r);
+	            ClassInfo dst = safeTarget(r);
+	            if (src == null || dst == null) continue;
 
-				// DEBUG: show exactly what we’re about to emit
-				System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + r.getType() + ")");
+	            String srcName = safeClassName(src);
+	            String dstName = safeClassName(dst);
 
-				sb.append(quoteIfNeeded(srcName)).append(' ').append(arrow).append(' ').append(quoteIfNeeded(dstName))
-						.append('\n');
-			}
-		}
+	            if (options.pruneDanglingRelationships) {
+	                if (!includedNames.contains(srcName) || !includedNames.contains(dstName)) {
+	                    continue; // skip relationships to filtered classes (e.g., DUMMY)
+	                }
+	            }
 
-		sb.append("@enduml").append('\n');
-		return sb.toString();
+	            RelationshipType rt = r.getType();
+	            String arrow;
+
+	            if (isInheritance(rt)) {
+	                // Left-pointing for inheritance; parent (target) first.
+	                arrow = (rt == RelationshipType.GENERALIZATION) ? "<|--" : "<|..";
+
+	                // DEBUG
+	                System.out.println("[REL][emit] " + dstName + " " + arrow + " " + srcName + " (" + rt + ")");
+
+	                sb.append(quoteIfNeeded(dstName)).append(' ')
+	                  .append(arrow).append(' ')
+	                  .append(quoteIfNeeded(srcName))
+	                  .append('\n');
+	            } else {
+	                arrow = toArrow(rt);
+	                if (arrow == null) continue;
+
+	                // DEBUG
+	                System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + rt + ")");
+
+	                sb.append(quoteIfNeeded(srcName)).append(' ')
+	                  .append(arrow).append(' ')
+	                  .append(quoteIfNeeded(dstName))
+	                  .append('\n');
+	            }
+	        } // ← closes for (Relationship r : rels)
+	    }     // ← closes if (!rels.isEmpty())
+
+	    sb.append("@enduml").append('\n');
+	    return sb.toString();
 	}
+
 
 	// --- Preprocessing methods ---
 
@@ -477,4 +498,9 @@ public final class PlantUMLGenerator {
 		}
 		return n;
 	}
+	
+	private static boolean isInheritance(RelationshipType t) {
+	    return t == RelationshipType.GENERALIZATION || t == RelationshipType.REALIZATION;
+	}
+
 }

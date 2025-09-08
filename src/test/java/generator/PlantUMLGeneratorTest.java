@@ -35,7 +35,7 @@ public class PlantUMLGeneratorTest {
         // Class
         ClassInfo user = new ClassInfo("User", ClassType.CLASS, ClassDeclaration.OFFICIAL);
         user.addAttribute(new Attribute("name", "String", "private"));
-        user.addMethod(new Method("getName", "String", "public"));
+        user.addMethod(new Method("getName", "String", "public")); // updated ctor
 
         IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
         model.addClass(user);
@@ -107,18 +107,16 @@ public class PlantUMLGeneratorTest {
         model.addClass(cls);
 
         // Even if mis-tagged upstream, normalization should coerce correctly
-        model.addRelationship(new Relationship(cc2, cc1, RelationshipType.REALIZATION));   // should become GENERALIZATION
-        model.addRelationship(new Relationship(cls, ci1, RelationshipType.GENERALIZATION)); // should become REALIZATION
+        model.addRelationship(new Relationship(cc2, cc1, RelationshipType.REALIZATION));    // becomes GENERALIZATION
+        model.addRelationship(new Relationship(cls, ci1, RelationshipType.GENERALIZATION)); // becomes REALIZATION
         model.addRelationship(new Relationship(ci2, ci1, RelationshipType.GENERALIZATION)); // stays GENERALIZATION
 
         String n = norm(new PlantUMLGenerator().generate(model));
 
-        // Class -> Class : --|>
-        assertTrue(n.contains("Child --|> Base"));
-        // Class -> Interface : ..|>
-        assertTrue(n.contains("Painter ..|> IShape"));
-        // Interface -> Interface : --|>
-        assertTrue(n.contains("Drawable --|> IShape"));
+        // New left-pointing expectations:
+        assertTrue(n.contains("Base <|-- Child"));    // Class -> Class
+        assertTrue(n.contains("IShape <|.. Painter")); // Class -> Interface
+        assertTrue(n.contains("IShape <|-- Drawable")); // Interface -> Interface
     }
 
     @Test
@@ -138,8 +136,10 @@ public class PlantUMLGeneratorTest {
         model.addRelationship(new Relationship(en, in, RelationshipType.REALIZATION));
 
         String n = norm(new PlantUMLGenerator().generate(model));
-        assertFalse(n.contains("E --|> C"));
-        assertFalse(n.contains("E ..|> I"));
+
+        // Check absence using new left-pointing style
+        assertFalse(n.contains("C <|-- E"));
+        assertFalse(n.contains("I <|.. E"));
     }
 
     @Test
@@ -162,6 +162,7 @@ public class PlantUMLGeneratorTest {
         assertFalse(n.contains("A *-- B"));
         assertFalse(n.contains("A --|> B"));
         assertFalse(n.contains("A ..|> B"));
+        // (left-pointing inheritance doesn't apply to dependency, so the above is enough)
     }
 
     @Test
@@ -181,6 +182,8 @@ public class PlantUMLGeneratorTest {
         assertFalse(n.contains("A ..> A"));
         assertFalse(n.contains("A --|> A"));
         assertFalse(n.contains("A ..|> A"));
+        assertFalse(n.contains("A <|-- A"));
+        assertFalse(n.contains("A <|.. A"));
         assertTrue(n.contains("class A {"));
     }
 
