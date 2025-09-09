@@ -26,20 +26,34 @@ public class SelectionController {
 
     @GetMapping("/select")
     public String showSelect(HttpSession session, Model model) {
-        // Left-hand tree data
         model.addAttribute("scanMap", session.getAttribute("scanMap"));
-
-        // Mode / flow flags
         model.addAttribute("codeOnly", session.getAttribute("codeOnly"));
-        model.addAttribute("mode", session.getAttribute("mode")); // to preselect radios
         model.addAttribute("workspaceRoot", session.getAttribute("workspaceRoot"));
 
-        // ✅ PlantUML filenames for the right-hand panel (UI only)
+        Object modeAttr = session.getAttribute("mode");
+        model.addAttribute("mode", modeAttr != null ? modeAttr : "RELAXED");
+
         @SuppressWarnings("unchecked")
         List<String> plantumlNames = (List<String>) session.getAttribute("plantumlNames");
         model.addAttribute("plantumlNames", plantumlNames);
+        model.addAttribute("plantumlFileCount", plantumlNames == null ? 0 : plantumlNames.size());
 
         return "select";
+    }
+
+    // GET fallback to avoid 404 if someone navigates directly to /select/confirm
+    @GetMapping("/select/confirm")
+    public String confirmSelectionGet(
+            HttpSession session,
+            @RequestParam(name = "selectedFqcns", required = false) List<String> selectedFqcns,
+            @RequestParam(name = "mode", required = false, defaultValue = "RELAXED") String modeStr
+    ) {
+        // If no selection present on GET, send user back to the selection page
+        if (selectedFqcns == null || selectedFqcns.isEmpty()) {
+            return "redirect:/select";
+        }
+        // Delegate to the same logic as POST to keep behavior identical
+        return confirmSelection(session, selectedFqcns, modeStr);
     }
 
     @PostMapping("/select/confirm")
@@ -48,6 +62,11 @@ public class SelectionController {
             @RequestParam(name = "selectedFqcns", required = false) List<String> selectedFqcns,
             @RequestParam(name = "mode", required = false, defaultValue = "RELAXED") String modeStr
     ) {
+        // Guard: if nothing is selected (e.g., stray submit), go back gracefully
+        if (selectedFqcns == null || selectedFqcns.isEmpty()) {
+            return "redirect:/select";
+        }
+
         String workspaceRoot = (String) session.getAttribute("workspaceRoot");
         Boolean codeOnly = (Boolean) session.getAttribute("codeOnly");
         if (codeOnly == null) codeOnly = Boolean.FALSE;
@@ -60,6 +79,12 @@ public class SelectionController {
 
         @SuppressWarnings("unchecked")
         List<String> plantumlFiles = (List<String>) session.getAttribute("plantumlFiles");
+
+        // Clear artifacts from any previous run so this run starts fresh
+        session.removeAttribute("lastGeneratedPuml");
+        session.removeAttribute("lastResult");
+        session.removeAttribute("lastReportText");
+        session.removeAttribute("officialCodeModel");
 
         Selection sel = new Selection(
                 workspaceRoot,

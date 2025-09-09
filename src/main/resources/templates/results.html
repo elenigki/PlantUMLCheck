@@ -36,11 +36,15 @@
         --pri-a: #14b8a6;
         --pri-b: #0ea5a3;
         --pri-h: #0d9488;
-		
-		--home-a: #60a5fa;  /* blue-400 */
-		--home-b: #3b82f6;  /* blue-500 */
-		--home-h: #2563eb;  /* blue-600 */
 
+        --home-a: #60a5fa; /* blue-400 */
+        --home-b: #3b82f6; /* blue-500 */
+        --home-h: #2563eb; /* blue-600 */
+
+        --pri-soft-bg: #e6fffb; /* teal-50 */
+        --pri-soft-bd: #99f6e4; /* teal-200 */
+        --pri-soft-tx: #0f766e; /* teal-700 */
+        --pri-soft-hv: #ccfbf1; /* teal-100 */
       }
 
       .wrap {
@@ -355,15 +359,23 @@
         cursor: not-allowed;
         transform: none;
       }
-	  
-	  .btn.home {
-		background: linear-gradient(135deg, var(--home-a), var(--home-b));
-		color: #fff;
-		}
-	.btn.home:hover {
-		background: linear-gradient(135deg, var(--home-b), var(--home-h));
-		}
 
+      .btn.home {
+        background: linear-gradient(135deg, var(--home-a), var(--home-b));
+        color: #fff;
+      }
+      .btn.home:hover {
+        background: linear-gradient(135deg, var(--home-b), var(--home-h));
+      }
+
+      .btn.primary-alt {
+        background: var(--pri-soft-bg);
+        color: var(--pri-soft-tx);
+        border: 1px solid var(--pri-soft-bd);
+      }
+      .btn.primary-alt:hover {
+        background: var(--pri-soft-hv);
+      }
 
       .toast {
         position: fixed;
@@ -597,10 +609,10 @@
       >
         <div class="card-body">
           <div class="code-actions top">
-            <button type="button" class="btn pastel" onclick="copyUml()">
+            <button type="button" class="btn primary-alt" onclick="copyUml()">
               Copy
             </button>
-            <a class="btn pastel" th:href="@{/results/uml.puml}"
+            <a class="btn primary-alt" th:href="@{/results/uml.puml}"
               >Export (puml)</a
             >
           </div>
@@ -624,24 +636,38 @@
         </div>
       </section>
 
-<!-- Sticky actions -->
-<div class="actions-bar" th:classappend="${result.codeOnly} ? ' solo' : ''">
-  <a class="btn lavender" th:href="@{/select}">Back to selection</a>
+      <!-- Sticky actions -->
+      <div
+        class="actions-bar"
+        th:classappend="${result.codeOnly} ? ' solo' : ''"
+      >
+        <a class="btn lavender" th:href="@{/select}">Back to selection</a>
 
-  <a class="btn ghost" th:if="${!result.codeOnly}" th:href="@{/results/report.txt}">
-    Export report (txt)
-  </a>
+        <a
+          class="btn ghost"
+          th:if="${!result.codeOnly}"
+          th:href="@{/results/report.txt}"
+        >
+          Export report (txt)
+        </a>
 
-  <a class="btn primary" th:if="${!result.codeOnly}" th:href="@{/results/generate-corrected}">
-    Generate corrected UML
-  </a>
+        <!-- Only for comparison flow, and only if UML hasn't been generated yet -->
+        <a
+          class="btn primary"
+          th:if="${!result.codeOnly and generatedPlantUml == null}"
+          th:href="@{/results/generate-corrected}"
+        >
+          Generate corrected UML
+        </a>
 
-  <!-- NEW: always visible -->
-  <a class="btn home" th:href="@{/}" aria-label="Go to homepage and start a new check">
-    New check
-  </a>
-</div>
-
+        <a
+          class="btn home"
+          th:href="@{/reset}"
+          aria-label="Go to homepage and start a new check"
+        >
+          New check
+        </a>
+      </div>
 
       <div id="toast" class="toast">Copied!</div>
     </main>

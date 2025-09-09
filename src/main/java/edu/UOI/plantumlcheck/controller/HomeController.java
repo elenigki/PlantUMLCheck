@@ -108,4 +108,18 @@ public class HomeController {
 
         return "redirect:/select";
     }
+    
+    @GetMapping("/reset")
+    public String reset(HttpSession session) {
+        // Wipe only what we set during a run. Safer than session.invalidate() if you rely on other flags.
+        String[] keys = {
+            "workspaceRoot", "scanMap",
+            "plantumlFiles", "plantumlNames",
+            "selectedFqcns", "mode", "codeOnly",
+            "lastResult", "lastReportText", "lastGeneratedPuml",
+            "officialCodeModel"
+        };
+        for (String k : keys) session.removeAttribute(k);
+        return "redirect:/";
+    }
 }
