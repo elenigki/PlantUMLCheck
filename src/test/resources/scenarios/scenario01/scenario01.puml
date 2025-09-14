@@ -1,0 +1,8 @@
+@startuml
+class scenario01.Customer
+class scenario01.Order
+interface scenario01.PaymentGateway
+class scenario01.CardGateway
+scenario01.Customer --> scenario01.Order
+scenario01.CardGateway ..|> scenario01.PaymentGateway
+@enduml

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyByte;
 
 public class JavaSourceParserTest {
 
@@ -214,9 +215,9 @@ public class JavaSourceParserTest {
 			System.out.printf("[%s] %s -> %s\n", r.getType(), r.getSourceClass().getName(),
 					r.getTargetClass().getName());
 		}
-		
-		for(String w: model.getWarnings()) {
-			System.out.println("[WARNING]: "+ w);
+
+		for (String w : model.getWarnings()) {
+			System.out.println("[WARNING]: " + w);
 		}
 
 		assertNotNull(model.findClassByName("ComplexExample"));
@@ -240,149 +241,254 @@ public class JavaSourceParserTest {
 		assertTrue(warnings.stream().anyMatch(w -> w.contains("Page")));
 		assertTrue(warnings.stream().anyMatch(w -> w.contains("Chapter")));
 	}
-	
+
 	@Test
 	public void testSetterAggregationDetection() throws Exception {
-	    JavaSourceParser parser = new JavaSourceParser();
-	    List<File> files = loadSampleFiles("setter");
-	    IntermediateModel model = parser.parse(files);
-	    
+		JavaSourceParser parser = new JavaSourceParser();
+		List<File> files = loadSampleFiles("setter");
+		IntermediateModel model = parser.parse(files);
+
 		for (Relationship r : model.getRelationships()) {
 			System.out.printf("[%s] %s -> %s\n", r.getType(), r.getSourceClass().getName(),
 					r.getTargetClass().getName());
 		}
 
-	    assertNotNull(model.findClassByName("SetterAggregationExample"));
+		assertNotNull(model.findClassByName("SetterAggregationExample"));
 
-	    assertRelationshipExists(model, "SetterAggregationExample", "Chapter", RelationshipType.AGGREGATION);
-	    assertNull(getRelationship(model, "SetterAggregationExample", "Book", RelationshipType.AGGREGATION));
+		assertRelationshipExists(model, "SetterAggregationExample", "Chapter", RelationshipType.AGGREGATION);
+		assertNull(getRelationship(model, "SetterAggregationExample", "Book", RelationshipType.AGGREGATION));
 
 	}
-	
+
 	@Test
 	void testMultilineMethodAndAttribute() throws Exception {
-	    File file = new File("src/test/resources/source_code_samples/MultilineExample.java");
-	    JavaSourceParser parser = new JavaSourceParser();
-	    IntermediateModel model = parser.parse(file);
+		File file = new File("src/test/resources/source_code_samples/MultilineExample.java");
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(file);
 
-	    assertEquals(1, model.getClasses().size());
+		assertEquals(1, model.getClasses().size());
 
-	    ClassInfo cls = model.getClasses().get(0);
-	    assertEquals("MultilineExample", cls.getName());
+		ClassInfo cls = model.getClasses().get(0);
+		assertEquals("MultilineExample", cls.getName());
 
-	    // Check attribute
-	    assertEquals(1, cls.getAttributes().size());
-	    Attribute attr = cls.getAttributes().get(0);
-	    assertEquals("name", attr.getName());
-	    assertEquals("String", attr.getType());
+		// Check attribute
+		assertEquals(1, cls.getAttributes().size());
+		Attribute attr = cls.getAttributes().get(0);
+		assertEquals("name", attr.getName());
+		assertEquals("String", attr.getType());
 
-	    // Check method
-	    assertEquals(1, cls.getMethods().size());
-	    Method method = cls.getMethods().get(0);
-	    assertEquals("setName", method.getName());
-	    assertEquals("void", method.getReturnType());
-	    assertTrue(method.getParameters().contains("String"));
+		// Check method
+		assertEquals(1, cls.getMethods().size());
+		Method method = cls.getMethods().get(0);
+		assertEquals("setName", method.getName());
+		assertEquals("void", method.getReturnType());
+		assertTrue(method.getParameters().contains("String"));
 	}
 
 	@Test
 	void testAdvancedMultilineParsing() throws Exception {
-	    File file = new File("src/test/resources/source_code_samples/AdvancedMultilineExample.java");
-	    JavaSourceParser parser = new JavaSourceParser();
-	    IntermediateModel model = parser.parse(file);
+		File file = new File("src/test/resources/source_code_samples/AdvancedMultilineExample.java");
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(file);
 
-	    for(ClassInfo c: model.getClasses()) {
-	    	 System.out.println("Class: " + c.getName() + " , Declaration: " + c.getDeclaration());
-	    	 for(Attribute a: c.getAttributes()) {
-	    		 if(!a.getName().isEmpty()) {
-	    			 System.out.println("Attributes: " + a.getName() + ", Type: " + a.getType()); 
-	    		 }
-	    	 }
-	    	 
-	    }
-	    
-	    for(Relationship r: model.getRelationships()) {
-	    	System.out.println("["+ r.getType()+"] Source: "+ r.getSourceClass().getName() + " Target: " + r.getTargetClass().getName());
-	    }
-	    
-	    
-	   
-	    // ======= Class Count =======
-	    assertEquals(3, model.getClasses().size(), "Expected 1 official class and 2 dummy classes.");
+		for (ClassInfo c : model.getClasses()) {
+			System.out.println("Class: " + c.getName() + " , Declaration: " + c.getDeclaration());
+			for (Attribute a : c.getAttributes()) {
+				if (!a.getName().isEmpty()) {
+					System.out.println("Attributes: " + a.getName() + ", Type: " + a.getType());
+				}
+			}
 
-	    long officialCount = model.getClasses().stream()
-	        .filter(c -> c.getDeclaration() == ClassDeclaration.OFFICIAL)
-	        .count();
-	    long dummyCount = model.getClasses().stream()
-	        .filter(c -> c.getDeclaration() == ClassDeclaration.DUMMY)
-	        .count();
-	    
-	    
+		}
 
-	    assertEquals(1, officialCount, "Expected 1 official class.");
-	    assertEquals(2, dummyCount, "Expected 2 dummy classes (Book, Page).");
+		for (Relationship r : model.getRelationships()) {
+			System.out.println("[" + r.getType() + "] Source: " + r.getSourceClass().getName() + " Target: "
+					+ r.getTargetClass().getName());
+		}
 
-	    // ======= Class Info =======
-	    ClassInfo cls = model.findClassByName("AdvancedMultilineExample");
-	    assertNotNull(cls, "Class 'AdvancedMultilineExample' should exist.");
-	    assertEquals(ClassDeclaration.OFFICIAL, cls.getDeclaration());
-	    
-	 // ======= Class Names and Declarations =======
-	    Map<String, ClassDeclaration> expectedClasses = Map.of(
-	        "AdvancedMultilineExample", ClassDeclaration.OFFICIAL,
-	        "Book", ClassDeclaration.DUMMY,
-	        "Page", ClassDeclaration.DUMMY
-	    );
+		// ======= Class Count =======
+		assertEquals(3, model.getClasses().size(), "Expected 1 official class and 2 dummy classes.");
 
-	    for (Map.Entry<String, ClassDeclaration> entry : expectedClasses.entrySet()) {
-	        String className = entry.getKey();
-	        ClassDeclaration expectedDeclaration = entry.getValue();
+		long officialCount = model.getClasses().stream().filter(c -> c.getDeclaration() == ClassDeclaration.OFFICIAL)
+				.count();
+		long dummyCount = model.getClasses().stream().filter(c -> c.getDeclaration() == ClassDeclaration.DUMMY).count();
 
-	        ClassInfo classInfo = model.findClassByName(className);
-	        assertNotNull(classInfo, "Expected class: " + className);
-	        assertEquals(expectedDeclaration, classInfo.getDeclaration(), "Class " + className + " should be declared as " + expectedDeclaration);
-	    }
+		assertEquals(1, officialCount, "Expected 1 official class.");
+		assertEquals(2, dummyCount, "Expected 2 dummy classes (Book, Page).");
 
+		// ======= Class Info =======
+		ClassInfo cls = model.findClassByName("AdvancedMultilineExample");
+		assertNotNull(cls, "Class 'AdvancedMultilineExample' should exist.");
+		assertEquals(ClassDeclaration.OFFICIAL, cls.getDeclaration());
 
-	    // ======= Attributes =======
-	    List<Attribute> attributes = cls.getAttributes();
-	    assertEquals(1, attributes.size(), "Expected one attribute.");
-	    Attribute booksAttr = attributes.get(0);
-	    assertEquals("books", booksAttr.getName());
-	    assertEquals("List<Book>", booksAttr.getType());
-	    assertEquals("-", booksAttr.getVisibility());
+		// ======= Class Names and Declarations =======
+		Map<String, ClassDeclaration> expectedClasses = Map.of("AdvancedMultilineExample", ClassDeclaration.OFFICIAL,
+				"Book", ClassDeclaration.DUMMY, "Page", ClassDeclaration.DUMMY);
 
-	    // ======= Methods =======
-	    List<Method> methods = cls.getMethods();
-	    assertEquals(2, methods.size(), "Expected two methods.");
+		for (Map.Entry<String, ClassDeclaration> entry : expectedClasses.entrySet()) {
+			String className = entry.getKey();
+			ClassDeclaration expectedDeclaration = entry.getValue();
 
-	    Method getPageMap = methods.stream()
-	        .filter(m -> m.getName().equals("getPageMap"))
-	        .findFirst().orElse(null);
-	    assertNotNull(getPageMap);
-	    assertEquals("Map<String,List<Page>>", getPageMap.getReturnType().replaceAll("\\s+", ""));
-	    assertEquals("+", getPageMap.getVisibility());
-	    assertEquals(List.of("String"), getPageMap.getParameters());
+			ClassInfo classInfo = model.findClassByName(className);
+			assertNotNull(classInfo, "Expected class: " + className);
+			assertEquals(expectedDeclaration, classInfo.getDeclaration(),
+					"Class " + className + " should be declared as " + expectedDeclaration);
+		}
 
-	    Method setBooks = methods.stream()
-	        .filter(m -> m.getName().equals("setBooks"))
-	        .findFirst().orElse(null);
-	    assertNotNull(setBooks);
-	    assertEquals("void", setBooks.getReturnType());
-	    assertEquals("+", setBooks.getVisibility());
-	    assertEquals(List.of("List<Book>"), setBooks.getParameters());
+		// ======= Attributes =======
+		List<Attribute> attributes = cls.getAttributes();
+		assertEquals(1, attributes.size(), "Expected one attribute.");
+		Attribute booksAttr = attributes.get(0);
+		assertEquals("books", booksAttr.getName());
+		assertEquals("List<Book>", booksAttr.getType());
+		assertEquals("-", booksAttr.getVisibility());
 
-	    // ======= Relationships =======
-	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.COMPOSITION);
-	    assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.AGGREGATION);
-	    assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.ASSOCIATION);
+		// ======= Methods =======
+		List<Method> methods = cls.getMethods();
+		assertEquals(2, methods.size(), "Expected two methods.");
 
-	    // ======= Dummy Class Warnings =======
-	    List<String> warnings = model.getWarnings();
-	    assertEquals(2, warnings.size(), "Expected 2 warnings for dummy classes.");
-	    assertTrue(warnings.stream().anyMatch(w -> w.contains("Book")));
-	    assertTrue(warnings.stream().anyMatch(w -> w.contains("Page")));
+		Method getPageMap = methods.stream().filter(m -> m.getName().equals("getPageMap")).findFirst().orElse(null);
+		assertNotNull(getPageMap);
+		assertEquals("Map<String,List<Page>>", getPageMap.getReturnType().replaceAll("\\s+", ""));
+		assertEquals("+", getPageMap.getVisibility());
+		assertEquals(List.of("String"), getPageMap.getParameters());
+
+		Method setBooks = methods.stream().filter(m -> m.getName().equals("setBooks")).findFirst().orElse(null);
+		assertNotNull(setBooks);
+		assertEquals("void", setBooks.getReturnType());
+		assertEquals("+", setBooks.getVisibility());
+		assertEquals(List.of("List<Book>"), setBooks.getParameters());
+
+		// ======= Relationships =======
+		assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.COMPOSITION);
+		assertRelationshipExists(model, "AdvancedMultilineExample", "Book", RelationshipType.AGGREGATION);
+		assertRelationshipExists(model, "AdvancedMultilineExample", "Page", RelationshipType.ASSOCIATION);
+
+		// ======= Dummy Class Warnings =======
+		List<String> warnings = model.getWarnings();
+		assertEquals(2, warnings.size(), "Expected 2 warnings for dummy classes.");
+		assertTrue(warnings.stream().anyMatch(w -> w.contains("Book")));
+		assertTrue(warnings.stream().anyMatch(w -> w.contains("Page")));
 	}
 
+	@Test
+	void parses_AllOnOneLine_ClassBodyAndMembers() throws IOException {
+		String src = """
+				package scenario01; public class Customer { private Order order; public void setOrder(Order order){ this.order = order; } public Order getOrder(){ return order; } }
+				""";
+		Path f = java.nio.file.Files.createTempFile("one_line_customer", ".java");
+		java.nio.file.Files.writeString(f, src);
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+		ClassInfo c = getClassByName(model, "Customer");
+		assertEquals(1, c.getAttributes().size());
+		assertEquals("Order", c.getAttributes().get(0).getType());
+		assertEquals(2, c.getMethods().size());
+		assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("setOrder")
+				&& m.getParameters().equals(List.of("Order")) && "void".equalsIgnoreCase(m.getReturnType())));
+		assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("getOrder") && m.getParameters().isEmpty()
+				&& "Order".equals(m.getReturnType())));
+		assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
+	}
+
+	@Test
+	void parses_MixedSameLineAndNewlines_InClassBody() throws IOException {
+		String src = """
+				package scenario01; public class Customer {
+				    private Order order; public void setOrder(Order order){ this.order = order; }
+				    public Order getOrder(){ return order; }
+				}
+				""";
+		Path f = java.nio.file.Files.createTempFile("mixed_lines_customer", ".java");
+		java.nio.file.Files.writeString(f, src);
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+		ClassInfo c = getClassByName(model, "Customer");
+		assertEquals(1, c.getAttributes().size());
+		assertEquals(2, c.getMethods().size());
+		assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
+	}
+
+	@Test
+	void doesNotSplit_ForLoopsOrStrings() throws IOException {
+		String src = """
+				package p; public class LoopHolder {
+				    public void run(int n){
+				        for (int i = 0; i < n; i++) { String s = "a;b}c"; }
+				    }
+				}
+				""";
+		Path f = java.nio.file.Files.createTempFile("for_loop_strings", ".java");
+		java.nio.file.Files.writeString(f, src);
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+		ClassInfo c = getClassByName(model, "LoopHolder");
+		assertEquals(1, c.getMethods().size());
+		assertTrue(c.getMethods().get(0).getName().equals("run"));
+		assertEquals(List.of("int"), c.getMethods().get(0).getParameters());
+	}
+
+	@Test
+	void parses_PackageImportChainFollowedByType() throws IOException {
+		String src = """
+				package p.q; import java.util.*; import java.io.*; public class C { public List<String> xs; }
+				""";
+		Path f = java.nio.file.Files.createTempFile("pkg_import_chain", ".java");
+		java.nio.file.Files.writeString(f, src);
+		JavaSourceParser parser = new JavaSourceParser();
+		IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+		ClassInfo c = getClassByName(model, "C");
+		assertEquals(1, c.getAttributes().size());
+		assertEquals("List<String>", c.getAttributes().get(0).getType());
+	}
+	
+	@Test
+	void parses_HeavilyMixedFormatting_WithComments_AndGenerics() throws IOException {
+	    String src = """
+        package demo; import java.util.*; public class Customer {
+            // field + method header on one physical line:
+            private List<Order> orders = new ArrayList<>(); public void addOrder(Order o){ /* start */ this.orders.add(o); /* } ; */ }
+            /* multi
+               line comment with } and ; inside */
+            private Map<String,Integer> stats = new HashMap<>(); // end-of-line comment ; }
+
+            // header on its own line, body starts on same line:
+            public int totalOrders(){ int c = 0; for (int i=0; i<orders.size(); i++) { c++; } return c; }
+
+            @Deprecated public List<Order> getOrders() { return orders; } // annotation + inline body
+        }
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("customer_mixed_big", ".java");
+	    java.nio.file.Files.writeString(f, src);
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+	    
+	    for(Attribute a: model.findClassByName("Customer").getAttributes()) {
+	    	System.out.println("Attribute: " + a.getName() + ", Type: " + a.getType() + ", Visibility: " + a.getVisibility());
+	    }
+	    for(Method m: model.findClassByName("Customer").getMethods()) {
+	    	System.out.println("Method: " + m.getName() + ", ReturnType: " + m.getReturnType() + ", Visibility: " + m.getVisibility());
+	    }
+
+	    ClassInfo c = getClassByName(model, "Customer");
+	    assertNotNull(c);
+
+	    // attributes
+	    assertTrue(c.getAttributes().stream().anyMatch(a -> a.getName().equals("orders")));
+	    assertTrue(c.getAttributes().stream().anyMatch(a -> a.getName().equals("stats")));
+
+	    // methods by name (don’t depend on parameter type rendering)
+	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("addOrder")));
+	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("totalOrders")));
+	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("getOrders")));
+
+	    // relationship via List<Order>
+	    assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
+	}
 
 
 

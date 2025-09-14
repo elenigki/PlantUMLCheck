@@ -55,6 +55,10 @@ public final class PlantUMLGenerator {
 	    if (originalModel == null) {
 	        throw new IllegalArgumentException("model is null");
 	    }
+	    System.out.println("Model relationships: ");
+	    for(Relationship r : originalModel.getRelationships()) {
+	    	System.out.println("Source: " + r.getSourceClass() + " , Target: " + r.getTargetClass() + " , Relationship: " + r.getType());
+	    }
 
 	    IntermediateModel model = withNormalizedRelationships(originalModel);
 

@@ -41,51 +41,73 @@ public class JavaSourceParser {
 	public IntermediateModel getIntermediateModel() {
 		return model;
 	}
-
 	// Parses a single Java file
 	private void parseFile(File file) throws IOException {
-		List<String> rawLines = preprocessor.readLines(file);
+	    List<String> rawLines = preprocessor.readLines(file);
 
-		for (int i = 0; i < rawLines.size(); i++) {
-			String line = preprocessor.cleanLine(rawLines.get(i));
-			if (line.isEmpty())
-				continue;
+	    for (int i = 0; i < rawLines.size(); i++) {
+	        String line = preprocessor.cleanLine(rawLines.get(i)); // clean
+	        if (line.isEmpty()) continue;
 
-			if (isClassDeclaration(line)) {
-				ClassInfo classInfo = parseClassInfo(line);
-				if (classInfo == null)
-					continue;
+	        if (isClassDeclaration(line)) {
+	            ClassInfo classInfo = parseClassInfo(line); // header
+	            if (classInfo == null) continue;
 
-				// Collect class body lines (until braces are balanced)
-				List<String> bodyLines = new ArrayList<>();
-				int braceCount = countBraces(line);
-				i++;
+	            // collect body (handles inline "{...}" too)
+	            List<String> bodyLines = new ArrayList<>();
+	            int braceCount = countBraces(line);
+	            int openPos = line.indexOf('{'), closePos = line.lastIndexOf('}');
+	            if (braceCount == 0 && openPos >= 0 && closePos > openPos) { // inline body
+	                bodyLines.add(line.substring(openPos + 1, closePos));
+	            } else {
+	                i++;
+	                while (i < rawLines.size() && braceCount > 0) {
+	                    String bodyLine = rawLines.get(i);
+	                    bodyLines.add(bodyLine);
+	                    braceCount += countBraces(bodyLine);
+	                    i++;
+	                }
+	            }
+	            
+	            bodyLines = preprocessor.preSplitLight(bodyLines);
 
-				while (i < rawLines.size() && braceCount > 0) {
-					bodyLines.add(rawLines.get(i));
-					braceCount += countBraces(rawLines.get(i));
-					i++;
-				}
+	            // pipeline with debug prints
+	            List<String> noComments   = preprocessor.cleanComments(bodyLines);
+	            System.out.println("noComments (" + classInfo.getName() + "):");
+	            noComments.forEach(s -> System.out.println("  · " + s));
 
-				// Step 1: Remove all comments (single-line and multi-line)
-				List<String> noComments = preprocessor.cleanComments(bodyLines);
+	            List<String> preExpanded  = preprocessor.splitTopLevelPerLine(noComments);
+	            System.out.println("preExpanded (" + classInfo.getName() + "):");
+	            preExpanded.forEach(s -> System.out.println("  · " + s));
 
-				// Step 2: Join multi-line declarations (e.g. attributes, methods)
-				List<String> logicalLines = preprocessor.joinLogicalLines(noComments);
+	            List<String> logicalLines = preprocessor.joinLogicalLines(preExpanded);
+	            System.out.println("logicalLines (" + classInfo.getName() + "):");
+	            logicalLines.forEach(s -> System.out.println("  · " + s));
 
-				// Step 3: Split any merged statements (e.g. "} public ...")
-				List<String> splitLines = preprocessor.splitMultipleStatements(logicalLines);
+	            List<String> expanded     = preprocessor.splitTopLevelPerLine(logicalLines);
+	            System.out.println("expanded (" + classInfo.getName() + "):");
+	            expanded.forEach(s -> System.out.println("  · " + s));
 
-				// Parse attributes and methods from cleaned & structured lines
-				parseAttributes(splitLines, classInfo);
+	            List<String> normalized   = preprocessor.separateMemberHeaders(expanded);
+	            System.out.println("normalized (" + classInfo.getName() + "):");
+	            normalized.forEach(s -> System.out.println("  · " + s));
+	            
 
-				// NEW: pick up interface abstract signatures like 'void draw();'
-				extractAbstractSignatures(splitLines, classInfo);
+	            List<String> splitLines   = preprocessor.splitMultipleStatements(normalized);
+	            System.out.println("splitLines FINAL (" + classInfo.getName() + "):");
+	            splitLines.forEach(s -> System.out.println("  · " + s));
+	            System.out.println("--------------------------------------------");
 
-				extractMethods(splitLines, classInfo);
-			}
-		}
+	            // parse
+	            parseAttributes(splitLines, classInfo);
+	            extractAbstractSignatures(splitLines, classInfo);
+	            extractMethods(splitLines, classInfo);
+	        }
+	    }
 	}
+
+
+
 
 	// Pattern to detect class, interface, enum
 	private static final Pattern CLASS_PATTERN = Pattern.compile(

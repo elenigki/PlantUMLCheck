@@ -139,4 +139,146 @@ public class JavaSourcePreprocessor {
 			}
 			return result;
 		}
+		
+		// NEW: split one string into top-level statements using ';' and '}' (string/comment safe)
+		public List<String> splitTopLevelStatements(String src) {
+		    if (src == null || src.isEmpty()) return Collections.emptyList();
+		    List<String> out = new ArrayList<>();
+		    StringBuilder cur = new StringBuilder();
+		    boolean inLine=false, inBlock=false, inStr=false, inChar=false, esc=false;
+		    int paren=0, bracket=0, brace=0;
+		    for (int i=0, n=src.length(); i<n; ) {
+		        char c = src.charAt(i), nx = (i+1<n)? src.charAt(i+1) : '\0';
+		        if (c=='\r' || c=='\n') { if (inLine) inLine=false; if (cur.length()>0 && cur.charAt(cur.length()-1)!=' ') cur.append(' '); i++; continue; }
+		        if (inBlock) { if (c=='*' && nx=='/') { inBlock=false; i+=2; } else { i++; } continue; }
+		        if (inLine) { i++; continue; }
+		        if (!inStr && !inChar) { if (c=='/' && nx=='/') { inLine=true; i+=2; continue; } if (c=='/' && nx=='*') { inBlock=true; i+=2; continue; } }
+		        if (!inChar && c=='"' && !inStr) { inStr=true; cur.append(c); i++; esc=false; continue; }
+		        if (inStr) { cur.append(c); if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='"') inStr=false; i++; continue; }
+		        if (!inStr && c=='\'' && !inChar) { inChar=true; cur.append(c); i++; esc=false; continue; }
+		        if (inChar) { cur.append(c); if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='\'') inChar=false; i++; continue; }
+		        if (c=='(') paren++; else if (c==')') paren=Math.max(0,paren-1);
+		        else if (c=='[') bracket++; else if (c==']') bracket=Math.max(0,bracket-1);
+		        else if (c=='{') brace++;
+		        else if (c=='}') { cur.append(c); brace=Math.max(0,brace-1);
+		            if (paren==0 && bracket==0 && brace==0) { String s=cur.toString().trim(); if(!s.isEmpty()) out.add(s); cur.setLength(0);
+		                i++; while (i<n && Character.isWhitespace(src.charAt(i))) i++; continue; }
+		            i++; continue;
+		        }
+		        if (c==';' && paren==0 && bracket==0 && brace==0) { cur.append(c); String s=cur.toString().trim(); if(!s.isEmpty()) out.add(s); cur.setLength(0);
+		            i++; while (i<n && Character.isWhitespace(src.charAt(i))) i++; continue; }
+		        cur.append(c); i++;
+		    }
+		    String tail=cur.toString().trim(); if(!tail.isEmpty()) out.add(tail);
+		    return out;
+		}
+
+		// NEW: apply the above per logical line, flattening only when needed
+		public List<String> splitTopLevelPerLine(List<String> lines) {
+		    List<String> out = new ArrayList<>();
+		    for (String l : lines) {
+		        if (l == null) continue;
+		        List<String> parts = splitTopLevelStatements(l);
+		        if (parts.size() <= 1) out.add(l.trim()); else out.addAll(parts);
+		    }
+		    return out;
+		}
+
+		// NEW: if a method/ctor header and its '{' are on the same line, split the remainder to a new line
+		public List<String> separateMemberHeaders(List<String> lines) {
+		    List<String> out = new ArrayList<>();
+		    for (String l : lines) {
+		        if (l == null) continue;
+		        String s = l.trim();
+		        // quick reject: no '{' or looks like a field/stmt ending with ';'
+		        if (s.indexOf('{') < 0 || s.endsWith(";")) { out.add(s); continue; }
+
+		        // very light check: something like "... name(... ) {"
+		        // (don’t try to be smart—just split at the FIRST top-level '{')
+		        int paren = 0, bracket = 0, brace = 0, cut = -1;
+		        boolean inStr=false,inChar=false,esc=false,inLine=false,inBlock=false;
+		        for (int i=0;i<s.length();i++){
+		            char c=s.charAt(i), nx=(i+1<s.length()?s.charAt(i+1):'\0');
+		            if (c=='\n') { if (inLine) inLine=false; continue; }
+		            if (inBlock){ if (c=='*'&&nx=='/'){inBlock=false; i++;} continue; }
+		            if (inLine) continue;
+		            if (!inStr && !inChar) {
+		                if (c=='/'&&nx=='/'){inLine=true; i++; continue;}
+		                if (c=='/'&&nx=='*'){inBlock=true; i++; continue;}
+		            }
+		            if (!inChar && c=='"' && !inStr){inStr=true; esc=false; continue;}
+		            if (inStr){ if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='"') inStr=false; continue; }
+		            if (!inStr && c=='\'' && !inChar){inChar=true; esc=false; continue;}
+		            if (inChar){ if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='\'') inChar=false; continue;}
+
+		            if (c=='(') paren++; else if (c==')') paren=Math.max(0,paren-1);
+		            else if (c=='[') bracket++; else if (c==']') bracket=Math.max(0,bracket-1);
+		            else if (c=='{') { if (paren==0 && bracket==0 && brace==0) { cut = i; break; } brace++; }
+		            else if (c=='}') brace = Math.max(0, brace-1);
+		        }
+		        if (cut < 0) { out.add(s); continue; }                 // nothing to split
+		        String head = s.substring(0, cut+1).trim();            // keep '{' with header
+		        String rest = s.substring(cut+1).trim();               // move body start to next line
+		        out.add(head);
+		        if (!rest.isEmpty()) out.add(rest);
+		    }
+		    return out;
+		}
+		// NEW: if a top-level method/ctor header ends with '{' (and no '}' on the same line), append a '}'.
+		public List<String> closeDanglingMethodHeaders(List<String> lines) {
+		    List<String> out = new ArrayList<>();
+		    for (String s : lines) {
+		        if (s == null) continue;
+		        String t = s.trim();
+
+		        // quick rejects
+		        if (t.isEmpty() || t.indexOf('{') < 0 || t.indexOf('}') >= 0) { out.add(t); continue; }
+		        if (!t.endsWith("{")) { out.add(t); continue; }             // only care when it ends with '{'
+		        if (t.contains(" if ") || t.startsWith("if ") ||            // avoid control blocks (defensive)
+		            t.startsWith("for ") || t.contains(" for ") ||
+		            t.startsWith("while ") || t.contains(" while ") ||
+		            t.startsWith("switch ") || t.contains(" switch ") ||
+		            t.startsWith("try ") || t.startsWith("catch ") ||
+		            t.startsWith("finally ")) { out.add(t); continue; }
+
+		        // heuristic: treat as member header when it has balanced (...) and ends with '{'
+		        int paren = 0; boolean ok = false;
+		        for (int i = 0; i < t.length(); i++) {
+		            char c = t.charAt(i);
+		            if (c == '(') paren++;
+		            else if (c == ')') paren--;
+		        }
+		        ok = (paren == 0) && t.contains("(") && t.endsWith("{");
+		        out.add(ok ? (t + "}") : t); // normalize: "header{ }" → "header{}"
+		    }
+		    return out;
+		}
+
+		// NEW: lightly split obvious multi-statements so regexes see clean lines
+		public List<String> preSplitLight(List<String> lines) {
+		    List<String> out = new ArrayList<>();
+		    for (String s : lines) {
+		        if (s == null) continue;
+		        String t = s;
+
+		        // split package/import chains: "...; import ..." and "...; package ..."
+		        t = t.replaceAll("(?<=;)\\s+(?=package\\b|import\\b)", "\n");
+
+		        // split after ';' when a new member/type/annotation likely starts
+		        t = t.replaceAll(";\\s+(?=@?\\s*(public|protected|private|static|final|abstract|class|interface|enum|record|@))", ";\n");
+
+		        // split after '}' when a new type/annotated decl likely follows
+		        t = t.replaceAll("(?<=\\})\\s+(?=@?\\s*(public|protected|private|class|interface|enum|record|@))", "\n");
+
+		        // flatten
+		        for (String part : t.split("\\R+")) {
+		            String p = part.trim();
+		            if (!p.isEmpty()) out.add(p);
+		        }
+		    }
+		    return out;
+		}
+
+
+
 }

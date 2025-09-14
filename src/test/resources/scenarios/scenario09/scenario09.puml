@@ -1,0 +1,6 @@
+@startuml
+class scenario09.Box {
+  + int size
+  + void setSize(int s)
+}
+@enduml

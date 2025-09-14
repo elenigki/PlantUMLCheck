@@ -1,0 +1,5 @@
+@startuml
+class scenario12.Service
+class scenario12.Helper
+scenario12.Service ..> scenario12.Helper
+@enduml

@@ -1,0 +1,5 @@
+@startuml
+class scenario05.User {
+  + String getEmail()
+}
+@enduml
