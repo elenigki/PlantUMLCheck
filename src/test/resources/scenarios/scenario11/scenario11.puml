@@ -1,5 +1,9 @@
 @startuml
-interface scenario11.Drawable
-class scenario11.Painter
-scenario11.Painter --|> scenario11.Drawable
+interface Drawable {
+  + draw() : void
+}
+class Painter {
+  + draw() : void
+}
+Painter --|> Drawable
 @enduml

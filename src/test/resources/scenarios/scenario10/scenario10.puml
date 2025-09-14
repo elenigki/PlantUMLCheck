@@ -1,6 +1,9 @@
 @startuml
-class scenario10.Computer
-class scenario10.Cpu
-scenario10.Computer *-- scenario10.Cpu
-scenario10.Computer --> scenario10.Cpu
+class Computer {
+  - cpu : Cpu
+}
+class Cpu {
+}
+Computer *-- Cpu
+Computer --> Cpu
 @enduml

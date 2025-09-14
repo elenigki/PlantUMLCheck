@@ -1,5 +1,5 @@
 @startuml
-class scenario06.Calculator {
+class Calculator {
   + compute
 }
 @enduml

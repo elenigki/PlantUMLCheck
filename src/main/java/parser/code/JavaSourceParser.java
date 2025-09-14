@@ -41,6 +41,7 @@ public class JavaSourceParser {
 	public IntermediateModel getIntermediateModel() {
 		return model;
 	}
+	
 	// Parses a single Java file
 	private void parseFile(File file) throws IOException {
 	    List<String> rawLines = preprocessor.readLines(file);
@@ -61,15 +62,16 @@ public class JavaSourceParser {
 	                bodyLines.add(line.substring(openPos + 1, closePos));
 	            } else {
 	                i++;
+	                _ScanState st = new _ScanState(); // comment/string-aware state
 	                while (i < rawLines.size() && braceCount > 0) {
 	                    String bodyLine = rawLines.get(i);
 	                    bodyLines.add(bodyLine);
-	                    braceCount += countBraces(bodyLine);
+	                    braceCount += braceDeltaIgnoringComments(bodyLine, st); // <<< changed
 	                    i++;
 	                }
 	            }
-	            
-	            bodyLines = preprocessor.preSplitLight(bodyLines);
+
+	            bodyLines = preprocessor.preSplitLight(bodyLines); // light pre-split
 
 	            // pipeline with debug prints
 	            List<String> noComments   = preprocessor.cleanComments(bodyLines);
@@ -91,7 +93,6 @@ public class JavaSourceParser {
 	            List<String> normalized   = preprocessor.separateMemberHeaders(expanded);
 	            System.out.println("normalized (" + classInfo.getName() + "):");
 	            normalized.forEach(s -> System.out.println("  · " + s));
-	            
 
 	            List<String> splitLines   = preprocessor.splitMultipleStatements(normalized);
 	            System.out.println("splitLines FINAL (" + classInfo.getName() + "):");
@@ -776,4 +777,33 @@ public class JavaSourceParser {
 		}
 		return types;
 	}
+	
+	// comment/string-aware scan state
+	private static final class _ScanState {
+	    boolean inBlock = false, inStr = false, inChar = false, esc = false;
+	}
+
+	// net { } delta for one line, ignoring /*...*/, //..., "..." and '...'
+	private static int braceDeltaIgnoringComments(String s, _ScanState st) {
+	    if (s == null) return 0;
+	    int delta = 0;
+	    for (int i = 0, n = s.length(); i < n; i++) {
+	        char c = s.charAt(i), nx = (i + 1 < n) ? s.charAt(i + 1) : '\0';
+
+	        if (st.inBlock) { if (c == '*' && nx == '/') { st.inBlock = false; i++; } continue; }
+	        if (!st.inStr && !st.inChar && c == '/' && nx == '*') { st.inBlock = true; i++; continue; }
+	        if (!st.inStr && !st.inChar && c == '/' && nx == '/') break;
+
+	        if (!st.inChar && c == '"' && !st.inStr) { st.inStr = true; st.esc = false; continue; }
+	        if (st.inStr) { if (st.esc) st.esc = false; else if (c == '\\') st.esc = true; else if (c == '"') st.inStr = false; continue; }
+
+	        if (!st.inStr && c == '\'' && !st.inChar) { st.inChar = true; st.esc = false; continue; }
+	        if (st.inChar) { if (st.esc) st.esc = false; else if (c == '\\') st.esc = true; else if (c == '\'') st.inChar = false; continue; }
+
+	        if (c == '{') delta++;
+	        else if (c == '}') delta--;
+	    }
+	    return delta;
+	}
+
 }

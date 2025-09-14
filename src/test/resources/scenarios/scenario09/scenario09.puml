@@ -1,6 +1,6 @@
 @startuml
-class scenario09.Box {
-  + int size
-  + void setSize(int s)
+class Box {
+  + size : int
+  + setSize(int) : void
 }
 @enduml

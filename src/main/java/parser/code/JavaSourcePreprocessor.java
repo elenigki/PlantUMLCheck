@@ -280,5 +280,50 @@ public class JavaSourcePreprocessor {
 		}
 
 
+		// Split method/ctor headers from their bodies: "…){ BODY" → ["…){", "BODY"]
+		public List<String> splitMethodBodies(List<String> lines) {
+		    List<String> out = new ArrayList<>();
+		    for (String s : lines) {
+		        if (s == null) continue;
+		        String t = s.trim();
+		        if (t.isEmpty()) { out.add(t); continue; }
+
+		        // find top-level pattern ")\s*{" and split there (avoid control-flow)
+		        int paren = 0, brace = 0, cut = -1;
+		        boolean inStr=false,inChar=false,esc=false;
+		        String lower = t.toLowerCase();
+		        boolean looksLikeControl = lower.startsWith("if ") || lower.startsWith("for ")
+		                || lower.startsWith("while ") || lower.startsWith("switch ")
+		                || lower.startsWith("try ") || lower.startsWith("catch ") || lower.startsWith("finally ");
+
+		        for (int i=0;i<t.length()-1;i++) {
+		            char c = t.charAt(i), nx = t.charAt(i+1);
+		            if (inStr) { if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='"') inStr=false; continue; }
+		            if (inChar){ if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='\'') inChar=false; continue; }
+		            if (c=='"') { inStr=true; esc=false; continue; }
+		            if (c=='\''){ inChar=true; esc=false; continue; }
+
+		            if (c=='(') paren++; else if (c==')') paren=Math.max(0, paren-1);
+		            else if (c=='{') brace++; else if (c=='}') brace=Math.max(0, brace-1);
+
+		            if (paren==0 && brace==0 && c==')') {
+		                // skip spaces then check '{'
+		                int j=i+1;
+		                while (j<t.length() && Character.isWhitespace(t.charAt(j))) j++;
+		                if (j<t.length() && t.charAt(j)=='{') { cut = j; break; }
+		            }
+		        }
+
+		        if (!looksLikeControl && cut >= 0) {
+		            String head = t.substring(0, cut+1).trim();  // include '{'
+		            String rest = t.substring(cut+1).trim();     // body
+		            out.add(head);
+		            if (!rest.isEmpty()) out.add(rest);
+		        } else {
+		            out.add(t);
+		        }
+		    }
+		    return out;
+		}
 
 }

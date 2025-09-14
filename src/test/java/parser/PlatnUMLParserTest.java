@@ -370,7 +370,7 @@ public class PlatnUMLParserTest {
 	            "class H\n" +
 
 	            "A -> B\n" +             // ASSOCIATION
-	            "C --> D\n" +            // DEPENDENCY
+	            "C --> D\n" +            // ASSOCIATION
 	            "E --|> F\n" +           // GENERALIZATION
 	            "G ..|> I\n" +           // REALIZATION
 	            "H *-- A\n" +            // COMPOSITION
@@ -389,7 +389,7 @@ public class PlatnUMLParserTest {
 	    assertEquals(6, relationships.size());
 
 	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.ASSOCIATION));
-	    assertTrue(containsRelationship(relationships, "C", "D", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "C", "D", RelationshipType.ASSOCIATION));
 	    assertTrue(containsRelationship(relationships, "E", "F", RelationshipType.GENERALIZATION));
 	    assertTrue(containsRelationship(relationships, "G", "I", RelationshipType.REALIZATION));
 	    assertTrue(containsRelationship(relationships, "H", "A", RelationshipType.COMPOSITION));
@@ -408,7 +408,7 @@ public class PlatnUMLParserTest {
 	            "class F\n" +
 	            "class G\n" +
 
-	            "B <-- A\n" +          // Dependency
+	            "B <-- A\n" +          // Association
 	            "C <|-- D\n" +         // Generalization
 	            "I <|.. E\n" +         // Realization
 	            "A --* B\n" +          // Composition (reverse form)
@@ -427,7 +427,7 @@ public class PlatnUMLParserTest {
 
 	    assertEquals(6, relationships.size());
 
-	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.ASSOCIATION));
 	    assertTrue(containsRelationship(relationships, "D", "C", RelationshipType.GENERALIZATION));
 	    assertTrue(containsRelationship(relationships, "E", "I", RelationshipType.REALIZATION));
 	    assertTrue(containsRelationship(relationships, "B", "A", RelationshipType.COMPOSITION));
@@ -447,7 +447,7 @@ public class PlatnUMLParserTest {
 	            "class D\n" +
 	            "class E\n" +
 
-	            "A ---> B\n" +           // A → B (dependency)
+	            "A ---> B\n" +           // A → B (association)
 	            "C <... D\n" +           // D → C (association, reverse)
 	            "E ....|> I\n" +         // E → I (realization)
 	            "A --* D\n" +            // D → A (composition, reverse)
@@ -465,12 +465,79 @@ public class PlatnUMLParserTest {
 
 	    assertEquals(5, relationships.size());
 
-	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.DEPENDENCY));
+	    assertTrue(containsRelationship(relationships, "A", "B", RelationshipType.ASSOCIATION));
 	    assertTrue(containsRelationship(relationships, "D", "C", RelationshipType.DEPENDENCY));
 	    assertTrue(containsRelationship(relationships, "E", "I", RelationshipType.REALIZATION));
 	    assertTrue(containsRelationship(relationships, "D", "A", RelationshipType.COMPOSITION));
 	    assertTrue(containsRelationship(relationships, "D", "E", RelationshipType.AGGREGATION));
 	}
+	
+	@Test
+	public void testAttributesWithVisibilityNameColonType() throws IOException {
+	    String uml =
+	        "@startuml\n" +
+	        "class Person {\n" +
+	        "  - name : String\n" +   // visibility + name : Type
+	        "  + age  : int\n" +      // visibility + name : Type
+	        "}\n" +
+	        "@enduml\n";
+
+	    // Write UML to a temp file because PlantUMLParser.parse(File) is the entry point
+	    File tmp = File.createTempFile("person", ".puml");
+	    try (FileWriter fw = new FileWriter(tmp)) {
+	        fw.write(uml);
+	    }
+
+	    PlantUMLParser parser = new PlantUMLParser();
+	    IntermediateModel model = parser.parse(tmp);
+
+	    // Find the parsed class
+	    ClassInfo person = model.getClasses().stream()
+	        .filter(c -> "Person".equals(c.getName()))
+	        .findFirst()
+	        .orElseThrow(() -> new AssertionError("Person class not parsed"));
+
+	    // Grab attributes by name
+	    Attribute nameAttr = person.getAttributes().stream()
+	        .filter(a -> "name".equals(a.getName()))
+	        .findFirst()
+	        .orElseThrow(() -> new AssertionError("Attribute 'name' not found"));
+
+	    Attribute ageAttr = person.getAttributes().stream()
+	        .filter(a -> "age".equals(a.getName()))
+	        .findFirst()
+	        .orElseThrow(() -> new AssertionError("Attribute 'age' not found"));
+
+	    // Assert parsing of type + visibility for "name : String" and "age : int"
+	    assertEquals("String", nameAttr.getType(), "Type of 'name' should be String");
+	    assertEquals("-", nameAttr.getVisibility(), "Visibility of 'name' should be '-'");
+
+	    assertEquals("int", ageAttr.getType(), "Type of 'age' should be int");
+	    assertEquals("+", ageAttr.getVisibility(), "Visibility of 'age' should be '+'");
+	}
+
+	@Test
+	void constructorsAreIgnored() throws Exception {
+	    String uml =
+	        "@startuml\n" +
+	        "class Person {\n" +
+	        "  + Person(String name)\n" + // constructor → must be ignored
+	        "  + getName() : String\n" +
+	        "}\n" +
+	        "@enduml\n";
+	    File f = tempPUML(uml);
+
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+	    ClassInfo person = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Person"))
+	        .findFirst().orElseThrow();
+
+	    assertTrue(person.getMethods().stream().anyMatch(m -> m.getName().equals("getName")),
+	        "Normal method should be parsed");
+	    assertFalse(person.getMethods().stream().anyMatch(m -> m.getName().equals("Person")),
+	        "Constructor should be ignored");
+	}
+
 
 
 	private boolean containsRelationship(List<Relationship> relationships, String from, String to, RelationshipType type) {
@@ -480,4 +547,13 @@ public class PlatnUMLParserTest {
 	        r.getType() == type
 	    );
 	}
+	
+	private File tempPUML(String uml) throws IOException {
+	    File tmp = File.createTempFile("test", ".puml");
+	    try (FileWriter fw = new FileWriter(tmp)) {
+	        fw.write(uml);
+	    }
+	    return tmp;
+	}
+
 }

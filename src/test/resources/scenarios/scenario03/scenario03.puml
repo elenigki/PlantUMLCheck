@@ -1,7 +1,12 @@
 @startuml
-class scenario03.Manager
-class scenario03.Report
-class scenario03.Logger
-scenario03.Manager --> scenario03.Report
-scenario03.Manager --> scenario03.Logger
+class Manager {
+  - report : Report
+  + Manager(Report) : void
+}
+class Report {
+}
+class Logger {
+}
+Manager --> Report
+Manager --> Logger
 @enduml

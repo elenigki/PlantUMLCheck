@@ -312,7 +312,7 @@ public class PlantUMLParser {
 	        ClassInfo source = resolveOrCreateClass(model, sourceName, ClassType.CLASS);
 	        ClassInfo target = resolveOrCreateClass(model, targetName, ClassType.CLASS);
 
-	        // Determine the type of relationship based on the arrow
+	     // Determine the type of relationship based on the arrow
 	        RelationshipType type;
 	        if (arrow.contains("*")) {
 	            type = RelationshipType.COMPOSITION;
@@ -326,17 +326,18 @@ public class PlantUMLParser {
 	                type = RelationshipType.GENERALIZATION;
 	            }
 	        } else if (
-	            arrow.equals("->") ||
-	            arrow.equals("<-") ||
-	            arrow.equals("-")
+	            arrow.matches("\\.{2,}>") ||   // ..>
+	            arrow.matches("<\\.{2,}")      // <..
 	        ) {
-	            type = RelationshipType.ASSOCIATION;
-	        } else if (
-	            arrow.contains("..") ||
-	            arrow.matches("-{3,}>") || arrow.matches("<-{3,}>") ||
-	            arrow.equals("-->") || arrow.equals("<--")
-	        ) {
+	            // Dotted arrows are dependency
 	            type = RelationshipType.DEPENDENCY;
+	        } else if (
+	            arrow.matches("-+>") ||        // ->, --> (normalized to -->)
+	            arrow.matches("<-+") ||        // <-, <--
+	            arrow.matches("-+")            // -, -- (undirected solid line)
+	        ) {
+	            // Solid arrows/lines are association
+	            type = RelationshipType.ASSOCIATION;
 	        } else {
 	            type = RelationshipType.ASSOCIATION; // fallback
 	        }
@@ -348,41 +349,62 @@ public class PlantUMLParser {
 
 	// Handles attribute declarations in various UML styles.
 	private boolean parseAttribute(String line, ClassInfo currentClass) {
-		// Matches: "+ String name", "- int age"
-		Pattern standard = Pattern.compile("^([-+#])?\\s*([\\w<>]+)\\s+(\\w+);?$");
-		Matcher matcher = standard.matcher(line);
-		if (matcher.find()) {
-			String visibility = matcher.group(1);
-			if (visibility == null)
-				visibility = "";
-			String type = matcher.group(2);
-			String name = matcher.group(3);
-			currentClass.addAttribute(new Attribute(name, type, visibility));
-			return true;
-		}
+	    // Normalize and strip trailing semicolon if present
+	    String src = line.trim();
 
-		// Matches: "name : Type"
-		Pattern colon = Pattern.compile("^(\\w+)\\s*:\\s*([\\w<>]+);?$");
-		matcher = colon.matcher(line);
-		if (matcher.find()) {
-			String name = matcher.group(1);
-			String type = matcher.group(2);
-			currentClass.addAttribute(new Attribute(name, type, ""));
-			return true;
-		}
+	    // Common char classes
+	    // Type can include package dots, generics <>, arrays [], wildcard ?, and $
+	    String TYPE = "([\\w.$<>\\[\\]?]+)";
+	    String NAME = "([A-Za-z_\\$][A-Za-z0-9_\\$]*)";
+	    // Optional initializer (ignored)
+	    String OPT_INIT = "(?:\\s*=\\s*[^;]+)?";
+	    String OPT_SEMI_END = "\\s*;?\\s*";
 
-		// Matches: "Type name"
-		Pattern typeFirst = Pattern.compile("^([\\w<>]+)\\s+(\\w+);?$");
-		matcher = typeFirst.matcher(line);
-		if (matcher.find()) {
-			String type = matcher.group(1);
-			String name = matcher.group(2);
-			currentClass.addAttribute(new Attribute(name, type, ""));
-			return true;
-		}
+	    // 1) visibility + Type name    e.g. "+ String name"
+	    Pattern visTypeName = Pattern.compile("^([+\\-#~])\\s*" + TYPE + "\\s+" + NAME + OPT_INIT + OPT_SEMI_END + "$");
+	    Matcher m = visTypeName.matcher(src);
+	    if (m.find()) {
+	        String visibility = m.group(1);
+	        String type = m.group(2);
+	        String name = m.group(3);
+	        currentClass.addAttribute(new Attribute(name, type, visibility));
+	        return true;
+	    }
 
-		return false;
+	    // 2) visibility + name : Type  e.g. "- name : String"
+	    Pattern visNameColonType = Pattern.compile("^([+\\-#~])\\s*" + NAME + "\\s*:\\s*" + TYPE + OPT_INIT + OPT_SEMI_END + "$");
+	    m = visNameColonType.matcher(src);
+	    if (m.find()) {
+	        String visibility = m.group(1);
+	        String name = m.group(2);
+	        String type = m.group(3);
+	        currentClass.addAttribute(new Attribute(name, type, visibility));
+	        return true;
+	    }
+
+	    // 3) name : Type               e.g. "name : String"
+	    Pattern nameColonType = Pattern.compile("^" + NAME + "\\s*:\\s*" + TYPE + OPT_INIT + OPT_SEMI_END + "$");
+	    m = nameColonType.matcher(src);
+	    if (m.find()) {
+	        String name = m.group(1);
+	        String type = m.group(2);
+	        currentClass.addAttribute(new Attribute(name, type, ""));
+	        return true;
+	    }
+
+	    // 4) Type name                 e.g. "String name"
+	    Pattern typeName = Pattern.compile("^" + TYPE + "\\s+" + NAME + OPT_INIT + OPT_SEMI_END + "$");
+	    m = typeName.matcher(src);
+	    if (m.find()) {
+	        String type = m.group(1);
+	        String name = m.group(2);
+	        currentClass.addAttribute(new Attribute(name, type, ""));
+	        return true;
+	    }
+
+	    return false;
 	}
+
 
 	// Handles method declarations with or without visibility and return type.
 	private boolean parseMethod(String line, ClassInfo currentClass) {
@@ -396,6 +418,11 @@ public class PlantUMLParser {
 	        String name       = m1.group(2);
 	        String paramsRaw  = m1.group(3);
 	        String returnType = m1.group(4) == null ? "void" : m1.group(4).trim();
+
+	        // Skip constructors (method name equals class name)
+	        if (name.equals(currentClass.getName())) {
+	            return true; // consume but do not add
+	        }
 
 	        ArrayList<String> paramList = new ArrayList<>();
 	        if (!paramsRaw.isEmpty()) {
@@ -417,6 +444,11 @@ public class PlantUMLParser {
 	        String name       = m2.group(3);
 	        String paramsRaw  = m2.group(4);
 
+	        // Skip constructors (method name equals class name)
+	        if (name.equals(currentClass.getName())) {
+	            return true; // consume but do not add
+	        }
+
 	        ArrayList<String> paramList = new ArrayList<>();
 	        if (!paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
@@ -429,6 +461,7 @@ public class PlantUMLParser {
 
 	    return false;
 	}
+
 
 
 	// Checks if a line contains an explicit UML arrow relationship

@@ -1,7 +1,9 @@
 @startuml
-class scenario02.Library {
-  - scenario02.Book book
+class Library {
+  - book : Book
+  + Library() : void
 }
-class scenario02.Book
-scenario02.Library --> scenario02.Book
+class Book {
+}
+Library --> Book
 @enduml
