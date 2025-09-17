@@ -489,6 +489,44 @@ public class JavaSourceParserTest {
 	    // relationship via List<Order>
 	    assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
 	}
+	
+	@Test
+	void parses_TwoFieldDeclarations_OnOnePhysicalLine() throws Exception {
+	    String src = """
+	        package p; public class Duo {
+	            private int i; int j;
+	        }
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("two_fields_one_line", ".java");
+	    java.nio.file.Files.writeString(f, src);
+
+	    // enable to ensure the conservative splitter doesn't break this case
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+	    ClassInfo c = model.getClasses().stream()
+	            .filter(x -> "Duo".equals(x.getName()))
+	            .findFirst()
+	            .orElseThrow(() -> new AssertionError("Class 'Duo' not found"));
+
+	    assertEquals(2, c.getAttributes().size(), "Expected two fields on one physical line");
+
+	    // field 'i' (private int i;)
+	    assertTrue(
+	        c.getAttributes().stream()
+	         .anyMatch(a -> "i".equals(a.getName()) && "int".equals(a.getType())),
+	        "Expected field 'i : int'");
+
+	    // field 'j' (int j;)
+	    assertTrue(
+	        c.getAttributes().stream()
+	         .anyMatch(a -> "j".equals(a.getName()) && "int".equals(a.getType())),
+	        "Expected field 'j : int'");
+
+	    // no methods introduced by this snippet
+	    assertTrue(c.getMethods().isEmpty(), "No methods expected in Duo");
+	}
+
 
 
 

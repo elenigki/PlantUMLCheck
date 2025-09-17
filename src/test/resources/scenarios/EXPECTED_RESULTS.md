@@ -13,8 +13,8 @@
 
 ## 03_uml_extra_relationship
 - STRICT: ERROR (fail)
-- RELAXED: WARNING (pass)
-- MINIMAL: WARNING (pass)
+- RELAXED: WARNING (pass) (Will be false after fixing #TODO5)
+- MINIMAL: WARNING (pass) (Will be false after fixing #TODO5)
 
 ## 04_code_members_omitted_in_uml
 - STRICT: ERROR (fail)

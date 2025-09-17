@@ -18,6 +18,7 @@ public class JavaSourceParser {
 
 	private final IntermediateModel model;
 	private final JavaSourcePreprocessor preprocessor = new JavaSourcePreprocessor();
+	 private final boolean enableMultiCommand = false; // gate for experimental splitting
 
 	// Initializes empty model and warnings
 	public JavaSourceParser() {
@@ -66,19 +67,24 @@ public class JavaSourceParser {
 	                while (i < rawLines.size() && braceCount > 0) {
 	                    String bodyLine = rawLines.get(i);
 	                    bodyLines.add(bodyLine);
-	                    braceCount += braceDeltaIgnoringComments(bodyLine, st); // <<< changed
+	                    braceCount += braceDeltaIgnoringComments(bodyLine, st);
 	                    i++;
 	                }
 	            }
 
-	            bodyLines = preprocessor.preSplitLight(bodyLines); // light pre-split
+	            // decide per-class if we need multi-command normalization
+	            boolean needMulti = enableMultiCommand && preprocessor.detectMultiCommand(bodyLines);
 
-	            // pipeline with debug prints
-	            List<String> noComments   = preprocessor.cleanComments(bodyLines);
+	            // --- pipeline with debug prints ---
+	            // (A) optional: very conservative pre-split only when needed
+	            List<String> bodyStage = needMulti ? preprocessor.preSplitLight(bodyLines) : bodyLines;
+
+	            List<String> noComments   = preprocessor.cleanComments(bodyStage);
 	            System.out.println("noComments (" + classInfo.getName() + "):");
 	            noComments.forEach(s -> System.out.println("  · " + s));
 
-	            List<String> preExpanded  = preprocessor.splitTopLevelPerLine(noComments);
+	            // (B) optional top-level per-line split (safe) only when needed
+	            List<String> preExpanded  = needMulti ? preprocessor.splitTopLevelPerLine(noComments) : noComments;
 	            System.out.println("preExpanded (" + classInfo.getName() + "):");
 	            preExpanded.forEach(s -> System.out.println("  · " + s));
 
@@ -86,17 +92,31 @@ public class JavaSourceParser {
 	            System.out.println("logicalLines (" + classInfo.getName() + "):");
 	            logicalLines.forEach(s -> System.out.println("  · " + s));
 
-	            List<String> expanded     = preprocessor.splitTopLevelPerLine(logicalLines);
+	            List<String> expanded     = needMulti ? preprocessor.splitTopLevelPerLine(logicalLines) : logicalLines;
 	            System.out.println("expanded (" + classInfo.getName() + "):");
 	            expanded.forEach(s -> System.out.println("  · " + s));
 
-	            List<String> normalized   = preprocessor.separateMemberHeaders(expanded);
+	            // (C) optional header/body normalizers only when needed
+	            List<String> normalized   = needMulti ? preprocessor.separateMemberHeaders(expanded) : expanded;
 	            System.out.println("normalized (" + classInfo.getName() + "):");
 	            normalized.forEach(s -> System.out.println("  · " + s));
 
-	            List<String> splitLines   = preprocessor.splitMultipleStatements(normalized);
+	            List<String> methodSplit  = needMulti ? preprocessor.splitMethodBodies(normalized) : normalized;
+	            System.out.println("methodSplit (" + classInfo.getName() + "):");
+	            methodSplit.forEach(s -> System.out.println("  · " + s));
+
+	            //List<String> completed    = needMulti ? preprocessor.closeDanglingMethodHeaders(methodSplit) : methodSplit;
+	            List<String> completed = methodSplit;
+	            System.out.println("completed (" + classInfo.getName() + "):");
+	            completed.forEach(s -> System.out.println("  · " + s));
+
+	            // (D) legacy splitter always last
+	            List<String> splitLines   = preprocessor.splitMultipleStatements(completed);
 	            System.out.println("splitLines FINAL (" + classInfo.getName() + "):");
 	            splitLines.forEach(s -> System.out.println("  · " + s));
+	            
+	            
+	            System.out.println("needMulti=" + needMulti + "  enableMultiCommand=" + enableMultiCommand);
 	            System.out.println("--------------------------------------------");
 
 	            // parse
@@ -106,6 +126,7 @@ public class JavaSourceParser {
 	        }
 	    }
 	}
+
 
 
 
