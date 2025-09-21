@@ -576,7 +576,7 @@ public class PlatnUMLParserTest {
 	                 "class Config {\n" +
 	                 "  __VERSION : String__\n" +            // static attribute
 	                 "  path : String\n" +                   // normal attribute
-	                 "  __loadDefaults() : void__\n" +       // static method
+	                 "  + __loadDefaults() : void__\n" +       // static method
 	                 "  save(file : String) : void\n" +      // normal method
 	                 "}\n" +
 	                 "@enduml";
@@ -619,8 +619,8 @@ public class PlatnUMLParserTest {
 	                 "class Person {\n" +
 	                 "  __Person()__\n" +                    // constructor, wrapped → must be ignored
 	                 "  __Person(String name)__\n" +          // constructor with param, wrapped → ignored
-	                 "  __ID : int__\n" +                     // static attribute
-	                 "  getName() : String\n" +               // normal method
+	                 "  + __ID : int__\n" +                     // static attribute
+	                 "  - getName() : String\n" +               // normal method
 	                 "}\n" +
 	                 "@enduml";
 

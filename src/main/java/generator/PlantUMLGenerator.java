@@ -309,7 +309,7 @@ public final class PlantUMLGenerator {
 	}
 
 	// --- Helpers for class blocks ---
-
+	
 	private void emitTypeBlock(StringBuilder sb, ClassInfo ci) {
 	    String name = safeClassName(ci);
 
@@ -334,19 +334,19 @@ public final class PlantUMLGenerator {
 	        String type = safeType(a.getType());
 	        String attrName = safe(a.getName());
 
-	        // Build the inner content (without indentation)
-	        StringBuilder content = new StringBuilder();
-	        content.append(vis).append(' ').append(attrName);
+	        // Build the payload without visibility
+	        StringBuilder payload = new StringBuilder();
+	        payload.append(attrName);
 	        if (!type.isEmpty()) {
-	            content.append(" : ").append(type);
+	            payload.append(" : ").append(type);
 	        }
 
-	        // Write with indentation; wrap content in __...__ if static
-	        sb.append("  ");
+	        // Emit: visibility first, then underline payload if static
+	        sb.append("  ").append(vis).append(' ');
 	        if (a.isStatic()) {
-	            sb.append("__").append(content).append("__");
+	            sb.append("__").append(payload).append("__");
 	        } else {
-	            sb.append(content);
+	            sb.append(payload);
 	        }
 	        sb.append('\n');
 	    }
@@ -361,26 +361,26 @@ public final class PlantUMLGenerator {
 	        List<String> params = safeList(m.getParameters());
 	        String joinedParams = params.stream().map(PlantUMLGenerator::safeType).collect(Collectors.joining(", "));
 
-	        // Build the inner content (without indentation)
-	        StringBuilder content = new StringBuilder();
-	        content.append(vis).append(' ')
-	               .append(methodName).append('(').append(joinedParams).append(')');
+	        // Build the payload without visibility
+	        StringBuilder payload = new StringBuilder();
+	        payload.append(methodName).append('(').append(joinedParams).append(')');
 	        if (!returnType.isEmpty()) {
-	            content.append(" : ").append(returnType);
+	            payload.append(" : ").append(returnType);
 	        }
 
-	        // Write with indentation; wrap content in __...__ if static
-	        sb.append("  ");
+	        // Emit: visibility first, then underline payload if static
+	        sb.append("  ").append(vis).append(' ');
 	        if (m.isStatic()) {
-	            sb.append("__").append(content).append("__");
+	            sb.append("__").append(payload).append("__");
 	        } else {
-	            sb.append(content);
+	            sb.append(payload);
 	        }
 	        sb.append('\n');
 	    }
 
 	    sb.append("}").append('\n');
 	}
+
 
 
 	// --- Relationship arrow mapping ---

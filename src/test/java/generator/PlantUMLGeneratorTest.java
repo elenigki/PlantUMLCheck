@@ -224,8 +224,8 @@ public class PlantUMLGeneratorTest {
         String n = norm(new PlantUMLGenerator().generate(model));
 
         assertTrue(n.contains("class Utils {"));
-        assertTrue(n.contains("__+ VERSION : String__"), "Static attribute should be wrapped in __");
-        assertTrue(n.contains("__+ now() : long__"), "Static method should be wrapped in __");
+        assertTrue(n.contains("+ __VERSION : String__"), "Static attribute should be wrapped in __");
+        assertTrue(n.contains("+ __now() : long__"), "Static method should be wrapped in __");
     }
 
     @Test
@@ -255,9 +255,9 @@ public class PlantUMLGeneratorTest {
         String n = norm(new PlantUMLGenerator().generate(model));
 
         assertTrue(n.contains("- path : String"), "Non-static private attribute should render normally");
-        assertTrue(n.contains("__+ HOME : String__"), "Static public attribute should be underlined");
+        assertTrue(n.contains("+ __HOME : String__"), "Static public attribute should be underlined");
         assertTrue(n.contains("+ load() : void"), "Non-static method should render normally");
-        assertTrue(n.contains("__+ defaults() : Config__"), "Static method should be underlined");
+        assertTrue(n.contains("+ __defaults() : Config__"), "Static method should be underlined");
     }
 
     @Test

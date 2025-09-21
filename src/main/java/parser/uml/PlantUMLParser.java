@@ -347,63 +347,47 @@ public class PlantUMLParser {
 	}
 
 
-	// Handles attribute declarations in various UML styles, supports __...__ static wrapper
+	// Handles attribute declarations in various UML styles, supports both "__line__" and "+ __...__" static forms
 	private boolean parseAttribute(String line, ClassInfo currentClass) {
-	    // Detect and strip __...__ wrapper to mark static
-	    boolean isStatic = false;
 	    String src = line.trim();
+	    boolean isStatic = false;
+
+	    // Extract leading visibility if present
+	    String leadingVis = "";
+	    if (!src.isEmpty() && "+-#~".indexOf(src.charAt(0)) >= 0) {
+	        leadingVis = String.valueOf(src.charAt(0));
+	        src = src.substring(1).trim();
+	    }
+
+	    // Detect "__...__" wrapping on the remaining payload
 	    if (src.startsWith("__") && src.endsWith("__") && src.length() >= 4) {
 	        isStatic = true;
 	        src = src.substring(2, src.length() - 2).trim();
 	    }
 
-	    // 1) visibility + Type name   e.g. "+ String name", "- int age"
-	    Pattern visTypeName = Pattern.compile("^([-+#])?\\s*([\\w<>.\\[\\]]+)\\s+(\\w+)\\s*;?$");
+	    // 1) visibility + Type name  OR  Type name  (visibility may be from leadingVis)
+	    Pattern visTypeName = Pattern.compile("^([+\\-#~])?\\s*([\\w.$<>\\[\\]?]+)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*;?$");
 	    Matcher m = visTypeName.matcher(src);
 	    if (m.find()) {
-	        String visibility = m.group(1) == null ? "" : m.group(1);
+	        String vis = !leadingVis.isEmpty() ? leadingVis : (m.group(1) == null ? "" : m.group(1));
 	        String type = m.group(2);
 	        String name = m.group(3);
-	        Attribute attr = new Attribute(name, type, visibility);
-	        attr.setStatic(isStatic);
-	        currentClass.addAttribute(attr);
+	        Attribute a = new Attribute(name, type, vis);
+	        a.setStatic(isStatic);
+	        currentClass.addAttribute(a);
 	        return true;
 	    }
 
-	    // 2) visibility + name : Type e.g. "- name : String", "+ age : int"
-	    Pattern visNameColonType = Pattern.compile("^([-+#])\\s*(\\w+)\\s*:\\s*([\\w<>.\\[\\]]+)\\s*;?$");
-	    m = visNameColonType.matcher(src);
-	    if (m.find()) {
-	        String visibility = m.group(1);
-	        String name = m.group(2);
-	        String type = m.group(3);
-	        Attribute attr = new Attribute(name, type, visibility);
-	        attr.setStatic(isStatic);
-	        currentClass.addAttribute(attr);
-	        return true;
-	    }
-
-	    // 3) name : Type              e.g. "name : String"
-	    Pattern nameColonType = Pattern.compile("^(\\w+)\\s*:\\s*([\\w<>.\\[\\]]+)\\s*;?$");
+	    // 2) visibility + name : Type  OR  name : Type  (visibility may be from leadingVis)
+	    Pattern nameColonType = Pattern.compile("^([+\\-#~])?\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*:\\s*([\\w.$<>\\[\\]?]+)\\s*;?$");
 	    m = nameColonType.matcher(src);
 	    if (m.find()) {
-	        String name = m.group(1);
-	        String type = m.group(2);
-	        Attribute attr = new Attribute(name, type, "");
-	        attr.setStatic(isStatic);
-	        currentClass.addAttribute(attr);
-	        return true;
-	    }
-
-	    // 4) Type name                e.g. "String name"
-	    Pattern typeName = Pattern.compile("^([\\w<>.\\[\\]]+)\\s+(\\w+)\\s*;?$");
-	    m = typeName.matcher(src);
-	    if (m.find()) {
-	        String type = m.group(1);
+	        String vis = !leadingVis.isEmpty() ? leadingVis : (m.group(1) == null ? "" : m.group(1));
 	        String name = m.group(2);
-	        Attribute attr = new Attribute(name, type, "");
-	        attr.setStatic(isStatic);
-	        currentClass.addAttribute(attr);
+	        String type = m.group(3);
+	        Attribute a = new Attribute(name, type, vis);
+	        a.setStatic(isStatic);
+	        currentClass.addAttribute(a);
 	        return true;
 	    }
 
@@ -412,67 +396,70 @@ public class PlantUMLParser {
 
 
 
-	// Handles method declarations with or without visibility and return type, with optional __...__ static wrapper
+
+	// Handles method declarations with or without visibility and return type; supports both "__line__" and "+ __...__" static forms
 	private boolean parseMethod(String line, ClassInfo currentClass) {
-	    // Detect and strip __...__ wrapper to mark static
-	    boolean isStatic = false;
 	    String src = line.trim();
-	    Matcher staticWrap = Pattern.compile("^__\\s*(.*?)\\s*__$").matcher(src);
-	    if (staticWrap.find()) {
-	        isStatic = true;
-	        src = staticWrap.group(1).trim(); // inner method text
+	    boolean isStatic = false;
+
+	    // Extract leading visibility if present
+	    String leadingVis = "";
+	    if (!src.isEmpty() && "+-#~".indexOf(src.charAt(0)) >= 0) {
+	        leadingVis = String.valueOf(src.charAt(0));
+	        src = src.substring(1).trim();
 	    }
 
-	    // 1) Original style: "+ doThing(int, String) : void"
-	    //    (kept first so existing diagrams keep working)
+	    // Detect "__...__" wrapping on the remaining payload
+	    if (src.startsWith("__") && src.endsWith("__") && src.length() >= 4) {
+	        isStatic = true;
+	        src = src.substring(2, src.length() - 2).trim();
+	    }
+
+	    // 1) UML-style: "name(params) : ReturnType"
 	    Matcher m1 = Pattern.compile(
-	        "^([-+#~])?\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w.$<>\\[\\]., ?]+))?$"
+	        "^([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w.$<>\\[\\]., ?]+))?\\s*;?$"
 	    ).matcher(src);
 	    if (m1.find()) {
-	        String visibility = m1.group(1) == null ? "" : m1.group(1);
-	        String name       = m1.group(2);
-	        String paramsRaw  = m1.group(3);
-	        String returnType = m1.group(4) == null ? "void" : m1.group(4).trim();
+	        String name       = m1.group(1);
+	        String paramsRaw  = m1.group(2) == null ? "" : m1.group(2);
+	        String returnType = m1.group(3) == null ? "void" : m1.group(3).trim();
+	        String visibility = leadingVis; // if none, keep ""
 
 	        // Skip constructors
-	        if (name.equals(currentClass.getName())) {
-	            return true; // consume but do not add
-	        }
+	        if (name.equals(currentClass.getName())) return true;
 
-	        ArrayList<String> paramList = new ArrayList<>();
-	        if (paramsRaw != null && !paramsRaw.isEmpty()) {
+	        ArrayList<String> params = new ArrayList<>();
+	        if (!paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                if (!p.isEmpty()) paramList.add(p.trim());
+	                if (!p.isEmpty()) params.add(p.trim());
 	            }
 	        }
-	        Method method = new Method(name, returnType, paramList, visibility);
+	        Method method = new Method(name, returnType, params, visibility);
 	        method.setStatic(isStatic);
 	        currentClass.addMethod(method);
 	        return true;
 	    }
 
-	    // 2) Java-like style: "+ void service()", "+ List<String> findAll()"
+	    // 2) Java-like: "ReturnType name(params)"
 	    Matcher m2 = Pattern.compile(
-	        "^([-+#~])?\\s*([\\w.$<>\\[\\]., ?]+)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*;?$"
+	        "^([\\w.$<>\\[\\]., ?]+)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*;?$"
 	    ).matcher(src);
 	    if (m2.find()) {
-	        String visibility = m2.group(1) == null ? "" : m2.group(1);
-	        String returnType = m2.group(2).trim();
-	        String name       = m2.group(3);
-	        String paramsRaw  = m2.group(4);
+	        String returnType = m2.group(1).trim();
+	        String name       = m2.group(2);
+	        String paramsRaw  = m2.group(3) == null ? "" : m2.group(3);
+	        String visibility = leadingVis;
 
 	        // Skip constructors
-	        if (name.equals(currentClass.getName())) {
-	            return true; // consume but do not add
-	        }
+	        if (name.equals(currentClass.getName())) return true;
 
-	        ArrayList<String> paramList = new ArrayList<>();
-	        if (paramsRaw != null && !paramsRaw.isEmpty()) {
+	        ArrayList<String> params = new ArrayList<>();
+	        if (!paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                if (!p.isEmpty()) paramList.add(p.trim());
+	                if (!p.isEmpty()) params.add(p.trim());
 	            }
 	        }
-	        Method method = new Method(name, returnType, paramList, visibility);
+	        Method method = new Method(name, returnType, params, visibility);
 	        method.setStatic(isStatic);
 	        currentClass.addMethod(method);
 	        return true;
@@ -480,6 +467,7 @@ public class PlantUMLParser {
 
 	    return false;
 	}
+
 
 
 
