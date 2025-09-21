@@ -10,7 +10,7 @@ class Customer {
 class Order {
 }
 interface PaymentGateway {
-  + pay(double) : void
+  + pay(double amount) : void
 }
 PaymentGateway <|.. CardGateway
 Customer o-- Order

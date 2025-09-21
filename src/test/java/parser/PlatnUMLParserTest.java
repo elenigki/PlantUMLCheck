@@ -350,10 +350,10 @@ public class PlatnUMLParserTest {
 	    assertEquals("String", m.getReturnType());
 	    assertEquals("+", m.getVisibility());
 
-	    List<String> expectedParams = List.of("String author", "int year");
+	    List<String> expectedParams = List.of("String", "int");
 	    assertEquals(expectedParams.size(), m.getParameters().size());
-	    assertEquals("String author", m.getParameters().get(0));
-	    assertEquals("int year", m.getParameters().get(1));
+	    assertEquals("String", m.getParameters().get(0));
+	    assertEquals("int", m.getParameters().get(1));
 	}
 	
 	@Test
@@ -609,6 +609,7 @@ public class PlatnUMLParserTest {
 	    Method save = config.getMethods().stream()
 	        .filter(m -> m.getName().equals("save"))
 	        .findFirst().orElseThrow(() -> new AssertionError("Method 'save' not found"));
+	    System.out.println("Parameter: " + save.getParameters().get(0));
 	    assertEquals("void", save.getReturnType());
 	    assertFalse(save.isStatic(), "save should not be static");
 	}

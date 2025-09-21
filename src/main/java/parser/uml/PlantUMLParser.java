@@ -431,7 +431,9 @@ public class PlantUMLParser {
 	        ArrayList<String> params = new ArrayList<>();
 	        if (!paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                if (!p.isEmpty()) params.add(p.trim());
+	                if (p.isEmpty()) continue;
+	                String typeOnly = extractParamType(p);
+	                if (!typeOnly.isEmpty()) params.add(typeOnly);
 	            }
 	        }
 	        Method method = new Method(name, returnType, params, visibility);
@@ -456,7 +458,9 @@ public class PlantUMLParser {
 	        ArrayList<String> params = new ArrayList<>();
 	        if (!paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                if (!p.isEmpty()) params.add(p.trim());
+	                if (p.isEmpty()) continue;
+	                String typeOnly = extractParamType(p);
+	                if (!typeOnly.isEmpty()) params.add(typeOnly);
 	            }
 	        }
 	        Method method = new Method(name, returnType, params, visibility);
@@ -467,6 +471,7 @@ public class PlantUMLParser {
 
 	    return false;
 	}
+
 
 
 
@@ -490,6 +495,31 @@ public class PlantUMLParser {
 		model.addWarning("Class '" + name + "' not found in UML declarations. Added as dummy.");
 		return ci;
 	}
+	
+	// Extracts only the parameter TYPE from a raw parameter token.
+	// Accepts: "name : Type", "Type name", "Type", "List<String> xs", "String[] args"
+	private String extractParamType(String raw) {
+	    if (raw == null) return "";
+	    String s = raw.trim();
+	    if (s.isEmpty()) return "";
+
+	    // Case: "name : Type"
+	    Matcher mColon = Pattern.compile("^([A-Za-z_$][A-Za-z0-9_$]*)\\s*:\\s*(.+)$").matcher(s);
+	    if (mColon.find()) {
+	        String type = mColon.group(2).trim();
+	        return type;
+	    }
+
+	    // Case: "Type name" or "Type"  (first token is the type)
+	    // Keep the full first token to preserve generics/arrays, e.g., "List<String>", "String[]"
+	    String[] parts = s.split("\\s+");
+	    if (parts.length >= 1) {
+	        return parts[0].trim();
+	    }
+
+	    return s;
+	}
+
 
 
 
