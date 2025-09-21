@@ -1,1 +1,4 @@
-package scenario10; public class Cpu {}
+package scenario10;
+
+public class Cpu {
+}

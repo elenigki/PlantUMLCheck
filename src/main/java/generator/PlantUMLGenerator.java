@@ -311,66 +311,77 @@ public final class PlantUMLGenerator {
 	// --- Helpers for class blocks ---
 
 	private void emitTypeBlock(StringBuilder sb, ClassInfo ci) {
-		String name = safeClassName(ci);
+	    String name = safeClassName(ci);
 
-		ClassType kind = ci.getClassType();
-		boolean isAbstract = safeIsAbstract(ci);
+	    ClassType kind = ci.getClassType();
+	    boolean isAbstract = safeIsAbstract(ci);
 
-		String headerKeyword;
-		switch (kind) {
-		case INTERFACE:
-			headerKeyword = "interface";
-			break;
-		case ENUM:
-			headerKeyword = "enum";
-			break;
-		case CLASS:
-		default:
-			headerKeyword = isAbstract ? "abstract class" : "class";
-			break;
-		}
+	    String headerKeyword;
+	    switch (kind) {
+	        case INTERFACE: headerKeyword = "interface"; break;
+	        case ENUM:      headerKeyword = "enum";      break;
+	        case CLASS:
+	        default:        headerKeyword = isAbstract ? "abstract class" : "class"; break;
+	    }
 
-		sb.append(headerKeyword).append(' ').append(quoteIfNeeded(name)).append(" {").append('\n');
+	    sb.append(headerKeyword).append(' ').append(quoteIfNeeded(name)).append(" {").append('\n');
 
-		// Attributes
-		for (Attribute a : safeList(ci.getAttributes())) {
-			if (shouldSkipVisibility(a.getVisibility()))
-				continue;
+	    // Attributes
+	    for (Attribute a : safeList(ci.getAttributes())) {
+	        if (shouldSkipVisibility(a.getVisibility())) continue;
 
-			String vis = normalizeVisibility(a.getVisibility());
-			String type = safeType(a.getType());
-			String attrName = safe(a.getName());
+	        String vis = normalizeVisibility(a.getVisibility());
+	        String type = safeType(a.getType());
+	        String attrName = safe(a.getName());
 
-			sb.append("  ").append(vis).append(' ').append(attrName);
+	        // Build the inner content (without indentation)
+	        StringBuilder content = new StringBuilder();
+	        content.append(vis).append(' ').append(attrName);
+	        if (!type.isEmpty()) {
+	            content.append(" : ").append(type);
+	        }
 
-			if (!type.isEmpty()) {
-				sb.append(" : ").append(type);
-			}
-			sb.append('\n');
-		}
+	        // Write with indentation; wrap content in __...__ if static
+	        sb.append("  ");
+	        if (a.isStatic()) {
+	            sb.append("__").append(content).append("__");
+	        } else {
+	            sb.append(content);
+	        }
+	        sb.append('\n');
+	    }
 
-		// Methods
-		for (Method m : safeList(ci.getMethods())) {
-			if (shouldSkipVisibility(m.getVisibility()))
-				continue;
+	    // Methods
+	    for (Method m : safeList(ci.getMethods())) {
+	        if (shouldSkipVisibility(m.getVisibility())) continue;
 
-			String vis = normalizeVisibility(m.getVisibility());
-			String methodName = safe(m.getName());
-			String returnType = safeType(m.getReturnType());
-			List<String> params = safeList(m.getParameters());
+	        String vis = normalizeVisibility(m.getVisibility());
+	        String methodName = safe(m.getName());
+	        String returnType = safeType(m.getReturnType());
+	        List<String> params = safeList(m.getParameters());
+	        String joinedParams = params.stream().map(PlantUMLGenerator::safeType).collect(Collectors.joining(", "));
 
-			String joinedParams = params.stream().map(PlantUMLGenerator::safeType).collect(Collectors.joining(", "));
+	        // Build the inner content (without indentation)
+	        StringBuilder content = new StringBuilder();
+	        content.append(vis).append(' ')
+	               .append(methodName).append('(').append(joinedParams).append(')');
+	        if (!returnType.isEmpty()) {
+	            content.append(" : ").append(returnType);
+	        }
 
-			sb.append("  ").append(vis).append(' ').append(methodName).append('(').append(joinedParams).append(')');
+	        // Write with indentation; wrap content in __...__ if static
+	        sb.append("  ");
+	        if (m.isStatic()) {
+	            sb.append("__").append(content).append("__");
+	        } else {
+	            sb.append(content);
+	        }
+	        sb.append('\n');
+	    }
 
-			if (!returnType.isEmpty()) {
-				sb.append(" : ").append(returnType);
-			}
-			sb.append('\n');
-		}
-
-		sb.append("}").append('\n');
+	    sb.append("}").append('\n');
 	}
+
 
 	// --- Relationship arrow mapping ---
 	private static String toArrow(RelationshipType type) {

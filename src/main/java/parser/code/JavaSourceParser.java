@@ -274,12 +274,19 @@ public class JavaSourceParser {
 	// Checks if line looks like an attribute
 	private boolean isAttributeDeclaration(String line) {
 		return line.matches(".*(private|protected|public)\\s+.+\\s+\\w+(\\s*=.+)?;");
+		
 	}
 
 	// Parses one field into an Attribute object
 	private Attribute parseAttribute(String line) {
 		// Supports lines like: private Map<String, List<Book>> bookIndex;
-		Pattern pattern = Pattern.compile("(private|protected|public)\\s+([\\w<>,\\s\\[\\]]+)\\s+(\\w+)\\s*(=.*)?;");
+		Pattern pattern = Pattern.compile(
+			    "^\\s*(private|protected|public)\\s*"            // 1: visibility
+			  + "((?:\\w+\\s+)*)"                               // 2: mods chunk (could contain 'static', or be empty)
+			  + "([\\w<>,\\s\\[\\]]+)\\s+"                      // 3: type
+			  + "(\\w+)\\s*(=.*)?;\\s*$"                        // 4: name
+			);
+
 		Matcher matcher = pattern.matcher(line);
 
 		if (!matcher.find()) {
@@ -287,10 +294,13 @@ public class JavaSourceParser {
 		}
 
 		String visibility = matcher.group(1);
-		String type = matcher.group(2).trim(); // full generic type
-		String name = matcher.group(3).trim();
+		String modsRaw    = matcher.group(2);          // could be "", "static ", "final static ", etc.
+		String type       = matcher.group(3).trim();
+		String name       = matcher.group(4).trim();
 
-		return new Attribute(name, normalizeType(type), visibilitySymbol(visibility));
+		Attribute attr = new Attribute(name, normalizeType(type), visibilitySymbol(visibility));
+		attr.setStatic(hasStatic(modsRaw));
+		return attr;
 	}
 
 
@@ -306,6 +316,11 @@ public class JavaSourceParser {
 					Set<String> types = extractGenericTypes(attr.getType());
 
 					boolean isMainComposed = isComposedAttribute(line, attr.getType());
+					
+					if (attr.isStatic()) {
+					    isMainComposed = false; // static fields never become composition
+					}
+					
 					String declared = attr.getType();
 
 					for (String type : types) {
@@ -336,10 +351,11 @@ public class JavaSourceParser {
 	// Method extraction patterns
 	// ==========================
 
-	private static final Pattern METHOD_PATTERN = Pattern.compile("^(public|protected|private)?\\s*" + // 1: visibility
-			"(static\\s+)?(final\\s+)?(abstract\\s+)?\\s*" + // 2-4: modifiers
-			"([\\w\\<\\>\\[\\]\\,\\s]+)\\s+" + // 5: return type (with <, >, [ ], , and whitespace)
-			"(\\w+)\\s*\\(([^)]*)\\)\\s*" // 6: method name, 7: parameters
+	private static final Pattern METHOD_PATTERN = Pattern.compile(  
+			"(public|protected|private)?\\s*"                // (1)
+			  + "((?:\\w+\\s+)*)\\s*"                            // (2) mods chunk (we'll only look for 'static')
+			  + "([\\w\\<\\>\\[\\]\\,\\s]+)\\s+"                 // (3) return type
+			  + "(\\w+)\\s*\\(([^)]*)\\)\\s*"                    // (4) name, (5) params
 	);
 
 	private static final Pattern METHOD_HEADER_PATTERN = Pattern
@@ -359,71 +375,72 @@ public class JavaSourceParser {
 
 	// Parses a full method body string into a Method object
 	private Method parseMethod(String methodBody, ClassInfo classInfo) {
-		String[] lines = methodBody.split("\\n");
-		if (lines.length == 0)
-			return null;
+	    String[] lines = methodBody.split("\\n");
+	    if (lines.length == 0)
+	        return null;
 
-		StringBuilder headerBuilder = new StringBuilder();
+	    StringBuilder headerBuilder = new StringBuilder();
 
-		// Join all lines of the header into a single string
-		for (String line : lines) {
-			String trimmed = line.trim();
-			if (trimmed.isEmpty())
-				continue;
+	    // Join all lines of the header into a single string
+	    for (String line : lines) {
+	        String trimmed = line.trim();
+	        if (trimmed.isEmpty())
+	            continue;
 
-			// Skip annotation lines
-			if (trimmed.startsWith("@"))
-				continue;
+	        // Skip annotation lines
+	        if (trimmed.startsWith("@"))
+	            continue;
 
-			headerBuilder.append(trimmed).append(" ");
+	        headerBuilder.append(trimmed).append(" ");
 
-			// Break after opening brace (assumes signature ends there)
-			if (trimmed.contains("{"))
-				break;
-		}
+	        // Break after opening brace (assumes signature ends there)
+	        if (trimmed.contains("{"))
+	            break;
+	    }
 
-		String headerLine = headerBuilder.toString().trim();
+	    String headerLine = headerBuilder.toString().trim();
 
-		// Match method signature
-		Matcher matcher = METHOD_PATTERN.matcher(headerLine);
-		if (!matcher.find()) {
-			if (!matcher.find()) {
-				return null;
-			}
-			return null;
-		}
+	    // Match method signature
+	    Matcher matcher = METHOD_PATTERN.matcher(headerLine);
+	    if (!matcher.find()) {
+	        return null;
+	    }
 
-		String visibilityKeyword = matcher.group(1); // public/private/etc
-		String returnType = normalizeType(matcher.group(5)); // return type
-		String methodName = matcher.group(6); // method name
-		String paramList = matcher.group(7); // parameters inside (...)
+	    String visibilityKeyword = matcher.group(1);
+	    String modsRaw           = matcher.group(2);
+	    String returnType        = normalizeType(matcher.group(3));
+	    String methodName        = matcher.group(4);
+	    String paramList         = matcher.group(5);
 
-		boolean isConstructor = isConstructor(methodName, classInfo);
-		String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
+	    // === NEW: completely ignore main method ===
+	    if ("main".equals(methodName) && "void".equals(returnType)) {
+	        return null;
+	    }
 
-		Method method = new Method(methodName, returnType, visibility);
+	    boolean isConstructor = isConstructor(methodName, classInfo);
+	    String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
+	    Method method = new Method(methodName, returnType, visibility);
+	    method.setStatic(hasStatic(modsRaw));
 
-		// Parse and track parameter types
-		Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
+	    // Parse and track parameter types
+	    Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
 
-		// Add dependency from return type (if not constructor)
-		if (!isConstructor) {
-			if (!isConstructor) {
-			}
+	    // Add dependency from return type (if not constructor)
+	    if (!isConstructor) {
+	        processReturnType(returnType, classInfo);
+	    }
 
-			processReturnType(returnType, classInfo);
-		}
+	    // Analyze method body (for composition, aggregation, etc.)
+	    analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
 
-		// Analyze method body (for composition, aggregation, etc.)
-		analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
+	    // Add method to class (constructors are excluded)
+	    if (!isConstructor) {
+	        classInfo.addMethod(method);
+	    }
 
-		// Add method to class (constructors are excluded)
-		if (!isConstructor) {
-			classInfo.addMethod(method);
-		}
-
-		return method;
+	    return method;
 	}
+
 
 	// NEW: picks up ';'-terminated interface method signatures (no body)
 	private void extractAbstractSignatures(List<String> lines, ClassInfo classInfo) {
@@ -682,80 +699,72 @@ public class JavaSourceParser {
 		return (int) s.chars().filter(ch -> ch == c).count();
 	}
 
-	// Detects assignments like 'this.field = new Type()' and adds COMPOSITION
-	// relationships
+	// Detects "this.field = new Type(...)" and adds COMPOSITION unless the field is static
 	private void extractCompositionAssignments(String methodBody, ClassInfo currentClass) {
-		// Match expressions like: this.field = new Type(...)
-		Pattern pattern = Pattern.compile("this\\.\\w+\\s*=\\s*new\\s+([a-zA-Z_][a-zA-Z0-9_<>]*)\\s*\\(");
-		Matcher matcher = pattern.matcher(methodBody);
+	    Pattern pattern = Pattern.compile("this\\.(\\w+)\\s*=\\s*new\\s+([a-zA-Z_][a-zA-Z0-9_<>]*)\\s*\\(");
+	    Matcher matcher = pattern.matcher(methodBody);
 
-		while (matcher.find()) {
-			String rawType = matcher.group(1);
+	    while (matcher.find()) {
+	        String fieldName = matcher.group(1);
+	        String rawType   = matcher.group(2);
+	        String cleaned   = stripGenerics(rawType); // e.g. List<Book> → List
 
-			// Remove generic part from the type (e.g. List<Book> → List)
-			String cleaned = stripGenerics(rawType);
+	        if (isJavaBuiltInType(cleaned)) continue;
 
-			// Skip built-in Java types
-			if (isJavaBuiltInType(cleaned)) {
-				continue;
-			}
+	        Attribute fld = findAttributeByName(currentClass, fieldName);
+	        ClassInfo targetClass = getOrCreateClass(cleaned);
+	        if (targetClass == null) continue;
 
-			// Safely get or create the referenced class
-			ClassInfo targetClass = getOrCreateClass(cleaned);
-			if (targetClass != null) {
-				Relationship relationship = new Relationship(currentClass, targetClass, RelationshipType.COMPOSITION);
-				model.addRelationship(relationship);
-			}
-		}
+	        RelationshipType rt = (fld != null && fld.isStatic())
+	                ? RelationshipType.ASSOCIATION   // static fields never imply composition
+	                : RelationshipType.COMPOSITION;
+
+	        model.addRelationship(new Relationship(currentClass, targetClass, rt));
+	    }
 	}
 
-	// Detects assignments like 'this.field = parameter;' inside constructors or
-	// setters
-	// and adds AGGREGATION relationships based on parameter types
+
+	// Detects "this.field = <param>;" inside constructors or simple setters and adds AGGREGATION unless the field is static
 	private void extractAggregationAssignments(String methodBody, ClassInfo currentClass, String methodName,
-			Map<String, String> paramNamesAndTypes) {
+	                                           Map<String, String> paramNamesAndTypes) {
 
-// Only apply this logic in constructors or simple setters
-		boolean isConstructor = methodName.equals(currentClass.getName());
-		boolean isSetter = methodName.startsWith("set") && paramNamesAndTypes.size() == 1;
+	    boolean isConstructor = methodName.equals(currentClass.getName());
+	    boolean isSetter = methodName.startsWith("set") && paramNamesAndTypes.size() == 1;
+	    if (!(isConstructor || isSetter)) return;
 
-		if (!(isConstructor || isSetter)) {
-			return;
-		}
+	    String normalizedBody = methodBody.replaceAll("\\s+", " ");
 
+	    for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
+	        String paramName = param.getKey();
+	        String paramType = param.getValue();
 
-		for (Map.Entry<String, String> param : paramNamesAndTypes.entrySet()) {
-			String paramName = param.getKey();
-			String paramType = param.getValue();
+	        // e.g., List<Book> → [List, Book]
+	        Set<String> types = extractGenericTypes(paramType);
+	        for (String raw : types) {
+	            String cleaned = stripGenerics(raw);
+	            if (isJavaBuiltInType(cleaned)) continue;
 
-// Extract all relevant types from the parameter type (e.g., List<Book> → [List, Book])
-			Set<String> types = extractGenericTypes(paramType);
+	            ClassInfo target = getOrCreateClass(cleaned);
+	            if (target == null) continue;
 
-			for (String raw : types) {
-				String cleaned = stripGenerics(raw);
+	            // capture the field name; scan ALL matches, not just the first
+	            Pattern aggPattern = Pattern.compile("\\bthis\\.(\\w+)\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;");
+	            Matcher m = aggPattern.matcher(normalizedBody);
+	            while (m.find()) {
+	                String fieldName = m.group(1);
+	                Attribute fld = findAttributeByName(currentClass, fieldName);
 
-// Skip Java built-in types like List, Map, etc.
-				if (isJavaBuiltInType(cleaned)) {
-					continue;
-				}
+	                RelationshipType rt = (fld != null && fld.isStatic())
+	                        ? RelationshipType.ASSOCIATION   // static fields never imply aggregation
+	                        : RelationshipType.AGGREGATION;
 
-// Prepare to match lines like: this.books = books;
-				String patternString = "\\bthis\\.[a-zA-Z0-9_]+\\s*=\\s*" + Pattern.quote(paramName) + "\\s*;";
-				String normalizedBody = methodBody.replaceAll("\\s+", " ");
-
-				Matcher matcher = Pattern.compile(patternString).matcher(normalizedBody);
-
-				if (matcher.find()) {
-					ClassInfo target = getOrCreateClass(cleaned);
-					if (target != null) {
-						Relationship rel = new Relationship(currentClass, target, RelationshipType.AGGREGATION);
-						model.addRelationship(rel);
-					}
-				} else {
-				}
-			}
-		}
+	                model.addRelationship(new Relationship(currentClass, target, rt));
+	            }
+	        }
+	    }
 	}
+
+
 
 	// Checks if an attribute includes `= new ...` → composition if it's main type
 	// or a collection
@@ -826,5 +835,14 @@ public class JavaSourceParser {
 	    }
 	    return delta;
 	}
+	
+	// Finds an attribute by simple name in the current class
+	private Attribute findAttributeByName(ClassInfo clazz, String name) {
+	    for (Attribute a : clazz.getAttributes()) {
+	        if (a.getName().equals(name)) return a;
+	    }
+	    return null;
+	}
+
 
 }

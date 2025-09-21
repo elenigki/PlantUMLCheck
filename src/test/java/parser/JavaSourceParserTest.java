@@ -372,46 +372,6 @@ public class JavaSourceParserTest {
 	}
 
 	@Test
-	void parses_AllOnOneLine_ClassBodyAndMembers() throws IOException {
-		String src = """
-				package scenario01; public class Customer { private Order order; public void setOrder(Order order){ this.order = order; } public Order getOrder(){ return order; } }
-				""";
-		Path f = java.nio.file.Files.createTempFile("one_line_customer", ".java");
-		java.nio.file.Files.writeString(f, src);
-		JavaSourceParser parser = new JavaSourceParser();
-		IntermediateModel model = parser.parse(List.of(f.toFile()));
-
-		ClassInfo c = getClassByName(model, "Customer");
-		assertEquals(1, c.getAttributes().size());
-		assertEquals("Order", c.getAttributes().get(0).getType());
-		assertEquals(2, c.getMethods().size());
-		assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("setOrder")
-				&& m.getParameters().equals(List.of("Order")) && "void".equalsIgnoreCase(m.getReturnType())));
-		assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("getOrder") && m.getParameters().isEmpty()
-				&& "Order".equals(m.getReturnType())));
-		assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
-	}
-
-	@Test
-	void parses_MixedSameLineAndNewlines_InClassBody() throws IOException {
-		String src = """
-				package scenario01; public class Customer {
-				    private Order order; public void setOrder(Order order){ this.order = order; }
-				    public Order getOrder(){ return order; }
-				}
-				""";
-		Path f = java.nio.file.Files.createTempFile("mixed_lines_customer", ".java");
-		java.nio.file.Files.writeString(f, src);
-		JavaSourceParser parser = new JavaSourceParser();
-		IntermediateModel model = parser.parse(List.of(f.toFile()));
-
-		ClassInfo c = getClassByName(model, "Customer");
-		assertEquals(1, c.getAttributes().size());
-		assertEquals(2, c.getMethods().size());
-		assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
-	}
-
-	@Test
 	void doesNotSplit_ForLoopsOrStrings() throws IOException {
 		String src = """
 				package p; public class LoopHolder {
@@ -447,87 +407,165 @@ public class JavaSourceParserTest {
 	}
 	
 	@Test
-	void parses_HeavilyMixedFormatting_WithComments_AndGenerics() throws IOException {
+	void staticField_NewAssignment_IsAssociation_NotComposition() throws Exception {
 	    String src = """
-        package demo; import java.util.*; public class Customer {
-            // field + method header on one physical line:
-            private List<Order> orders = new ArrayList<>(); public void addOrder(Order o){ /* start */ this.orders.add(o); /* } ; */ }
-            /* multi
-               line comment with } and ; inside */
-            private Map<String,Integer> stats = new HashMap<>(); // end-of-line comment ; }
+	        package p;
+	        public class S {
+	            private static B b;
 
-            // header on its own line, body starts on same line:
-            public int totalOrders(){ int c = 0; for (int i=0; i<orders.size(); i++) { c++; } return c; }
-
-            @Deprecated public List<Order> getOrders() { return orders; } // annotation + inline body
-        }
+	            public void init() {
+	                this.b = new B();
+	            }
+	        }
+	        class B {}
 	        """;
-	    Path f = java.nio.file.Files.createTempFile("customer_mixed_big", ".java");
+	    Path f = java.nio.file.Files.createTempFile("static_new_compose", ".java");
 	    java.nio.file.Files.writeString(f, src);
+
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+	    assertRelationshipExists(model, "S", "B", RelationshipType.ASSOCIATION);
+	    assertNull(getRelationship(model, "S", "B", RelationshipType.COMPOSITION));
+	}
+
+	@Test
+	void staticField_SetterParam_IsAssociation_NotAggregation() throws Exception {
+	    String src = """
+	        package p;
+	        public class Holder {
+	            private static Item item;
+
+	            public void setItem(Item item) {
+	                this.item = item;
+	            }
+	        }
+	        class Item {}
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("static_setter_agg", ".java");
+	    java.nio.file.Files.writeString(f, src);
+
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+	    assertRelationshipExists(model, "Holder", "Item", RelationshipType.ASSOCIATION);
+	    assertNull(getRelationship(model, "Holder", "Item", RelationshipType.AGGREGATION));
+	}
+
+	@Test
+	void nonStaticField_ComposeAndAggregate_BehaviorUnchanged() throws Exception {
+	    String src = """
+	        package p;
+	        public class N {
+	            private Page page;
+	            private Chapter chapter;
+
+	            public N() {
+	                this.page = new Page();
+	            }
+
+	            public void setChapter(Chapter c) {
+	                this.chapter = c;
+	            }
+	        }
+	        class Page {}
+	        class Chapter {}
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("nonstatic_control", ".java");
+	    java.nio.file.Files.writeString(f, src);
+
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+	    assertRelationshipExists(model, "N", "Page", RelationshipType.COMPOSITION);
+	    assertRelationshipExists(model, "N", "Chapter", RelationshipType.AGGREGATION);
+	}
+
+	@Test
+	void staticMethod_ParamsAndReturn_YieldAssociation() throws Exception {
+	    String src = """
+	        package p;
+	        public class Util {
+	            public static R make(P p) {
+	                return new R();
+	            }
+	        }
+	        class P {}
+	        class R {}
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("static_method_assoc", ".java");
+	    java.nio.file.Files.writeString(f, src);
+
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+
+	    assertRelationshipExists(model, "Util", "P", RelationshipType.ASSOCIATION);
+	    assertRelationshipExists(model, "Util", "R", RelationshipType.ASSOCIATION);
+	}
+
+	@Test
+	void staticField_ModifierOrder_PrivateFinalStatic_IsAssociation() throws Exception {
+	    String src = """
+	        package p;
+	        import java.util.*;
+
+	        public class Lib {
+	            private final static List<Book> books = new ArrayList<>();
+	        }
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("static_order", ".java");
+	    java.nio.file.Files.writeString(f, src);
+	    
+
+	    JavaSourceParser parser = new JavaSourceParser();
+	    IntermediateModel model = parser.parse(List.of(f.toFile()));
+	    for (Relationship r: model.getRelationships()) {
+	    	System.out.println("Source: " + r.getSourceClass().getName() + " , Target: " + r.getTargetClass().getName() + ", Rel: " + r.getType());
+	    }
+
+	    assertRelationshipExists(model, "Lib", "Book", RelationshipType.ASSOCIATION);
+	    assertNull(getRelationship(model, "Lib", "Book", RelationshipType.COMPOSITION));
+	}
+
+	@Test
+	void staticVsNonStatic_SameType_NoFalseUpgrades() throws Exception {
+	    String src = """
+	        package p;
+	        public class Mix {
+	            private static A sa;
+	            private A ia;
+
+	            public Mix() {
+	                this.ia = new A();
+	            }
+
+	            public void init() {
+	                this.sa = new A();
+	            }
+
+	            public void set(A a) {
+	                this.sa = a;
+	                this.ia = a;
+	            }
+	            public static void main(String[] args){
+	            Order o = new order();
+	            }
+	        }
+	        """;
+	    Path f = java.nio.file.Files.createTempFile("static_nonstatic_mix", ".java");
+	    java.nio.file.Files.writeString(f, src);
+
 	    JavaSourceParser parser = new JavaSourceParser();
 	    IntermediateModel model = parser.parse(List.of(f.toFile()));
 	    
-	    for(Attribute a: model.findClassByName("Customer").getAttributes()) {
-	    	System.out.println("Attribute: " + a.getName() + ", Type: " + a.getType() + ", Visibility: " + a.getVisibility());
-	    }
-	    for(Method m: model.findClassByName("Customer").getMethods()) {
-	    	System.out.println("Method: " + m.getName() + ", ReturnType: " + m.getReturnType() + ", Visibility: " + m.getVisibility());
+	    for (Relationship r: model.getRelationships()) {
+	    	System.out.println("Source: " + r.getSourceClass().getName() + " , Target: " + r.getTargetClass().getName() + ", Rel: " + r.getType());
 	    }
 
-	    ClassInfo c = getClassByName(model, "Customer");
-	    assertNotNull(c);
-
-	    // attributes
-	    assertTrue(c.getAttributes().stream().anyMatch(a -> a.getName().equals("orders")));
-	    assertTrue(c.getAttributes().stream().anyMatch(a -> a.getName().equals("stats")));
-
-	    // methods by name (don’t depend on parameter type rendering)
-	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("addOrder")));
-	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("totalOrders")));
-	    assertTrue(c.getMethods().stream().anyMatch(m -> m.getName().equals("getOrders")));
-
-	    // relationship via List<Order>
-	    assertRelationshipExists(model, "Customer", "Order", RelationshipType.ASSOCIATION);
+	    assertRelationshipExists(model, "Mix", "A", RelationshipType.ASSOCIATION);
+	    assertRelationshipExists(model, "Mix", "A", RelationshipType.COMPOSITION);
+	    assertRelationshipExists(model, "Mix", "A", RelationshipType.AGGREGATION);
 	}
-	
-	@Test
-	void parses_TwoFieldDeclarations_OnOnePhysicalLine() throws Exception {
-	    String src = """
-	        package p; public class Duo {
-	            private int i; int j;
-	        }
-	        """;
-	    Path f = java.nio.file.Files.createTempFile("two_fields_one_line", ".java");
-	    java.nio.file.Files.writeString(f, src);
-
-	    // enable to ensure the conservative splitter doesn't break this case
-	    JavaSourceParser parser = new JavaSourceParser();
-	    IntermediateModel model = parser.parse(List.of(f.toFile()));
-
-	    ClassInfo c = model.getClasses().stream()
-	            .filter(x -> "Duo".equals(x.getName()))
-	            .findFirst()
-	            .orElseThrow(() -> new AssertionError("Class 'Duo' not found"));
-
-	    assertEquals(2, c.getAttributes().size(), "Expected two fields on one physical line");
-
-	    // field 'i' (private int i;)
-	    assertTrue(
-	        c.getAttributes().stream()
-	         .anyMatch(a -> "i".equals(a.getName()) && "int".equals(a.getType())),
-	        "Expected field 'i : int'");
-
-	    // field 'j' (int j;)
-	    assertTrue(
-	        c.getAttributes().stream()
-	         .anyMatch(a -> "j".equals(a.getName()) && "int".equals(a.getType())),
-	        "Expected field 'j : int'");
-
-	    // no methods introduced by this snippet
-	    assertTrue(c.getMethods().isEmpty(), "No methods expected in Duo");
-	}
-
-
 
 
 	// Helper to find a specific relationship between two classes

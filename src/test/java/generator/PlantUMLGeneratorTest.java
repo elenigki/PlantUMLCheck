@@ -204,4 +204,90 @@ public class PlantUMLGeneratorTest {
         assertFalse(n.contains("class GhostType {"));
         assertFalse(n.contains("RealType --> GhostType"));
     }
+    
+    @Test
+    @DisplayName("Static members are underlined with __...__ in output")
+    void staticMembersAreUnderlined() {
+        ClassInfo utils = new ClassInfo("Utils", ClassType.CLASS, ClassDeclaration.OFFICIAL);
+
+        Attribute version = new Attribute("VERSION", "String", "public");
+        version.setStatic(true);
+        utils.addAttribute(version);
+
+        Method now = new Method("now", "long", "public");
+        now.setStatic(true);
+        utils.addMethod(now);
+
+        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
+        model.addClass(utils);
+
+        String n = norm(new PlantUMLGenerator().generate(model));
+
+        assertTrue(n.contains("class Utils {"));
+        assertTrue(n.contains("__+ VERSION : String__"), "Static attribute should be wrapped in __");
+        assertTrue(n.contains("__+ now() : long__"), "Static method should be wrapped in __");
+    }
+
+    @Test
+    @DisplayName("Static vs non-static members render correctly together")
+    void mixedStaticAndNonStatic() {
+        ClassInfo cfg = new ClassInfo("Config", ClassType.CLASS, ClassDeclaration.OFFICIAL);
+
+        Attribute path = new Attribute("path", "String", "private");
+        path.setStatic(false);
+        cfg.addAttribute(path);
+
+        Attribute home = new Attribute("HOME", "String", "public");
+        home.setStatic(true);
+        cfg.addAttribute(home);
+
+        Method load = new Method("load", "void", "public");
+        load.setStatic(false);
+        cfg.addMethod(load);
+
+        Method defaults = new Method("defaults", "Config", "public");
+        defaults.setStatic(true);
+        cfg.addMethod(defaults);
+
+        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
+        model.addClass(cfg);
+
+        String n = norm(new PlantUMLGenerator().generate(model));
+
+        assertTrue(n.contains("- path : String"), "Non-static private attribute should render normally");
+        assertTrue(n.contains("__+ HOME : String__"), "Static public attribute should be underlined");
+        assertTrue(n.contains("+ load() : void"), "Non-static method should render normally");
+        assertTrue(n.contains("__+ defaults() : Config__"), "Static method should be underlined");
+    }
+
+    @Test
+    @DisplayName("excludePrivate also hides private static members")
+    void excludePrivateHidesPrivateStatics() {
+        ClassInfo logger = new ClassInfo("Logger", ClassType.CLASS, ClassDeclaration.OFFICIAL);
+
+        Attribute counter = new Attribute("counter", "int", "private");
+        counter.setStatic(true);
+        logger.addAttribute(counter);
+
+        Method init = new Method("init", "void", "private");
+        init.setStatic(true);
+        logger.addMethod(init);
+
+        Method log = new Method("log", "void", "public");
+        log.setStatic(false);
+        logger.addMethod(log);
+
+        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
+        model.addClass(logger);
+
+        PlantUMLGenerator.Options opts = new PlantUMLGenerator.Options();
+        opts.excludePrivate = true;
+        String n = norm(new PlantUMLGenerator(opts).generate(model));
+
+        assertTrue(n.contains("class Logger {"));
+        assertFalse(n.contains("__- counter : int__"), "Private static attribute should be omitted");
+        assertFalse(n.contains("__- init() : void__"), "Private static method should be omitted");
+        assertTrue(n.contains("+ log() : void"), "Public non-static method should remain");
+    }
+
 }

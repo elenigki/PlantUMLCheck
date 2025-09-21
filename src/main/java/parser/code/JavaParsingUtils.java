@@ -67,4 +67,14 @@ public final class JavaParsingUtils {
 		return type.replaceAll("\\s*<\\s*", "<").replaceAll("\\s*>\\s*", ">").replaceAll("\\s*,\\s*", ",").trim();
 	}
 
+	public static String normalizeMods(String mods) {
+	    if (mods == null) return " ";
+	    String norm = mods.trim().replaceAll("\\s+", " ");
+	    return " " + norm + " ";
+	}
+	public static boolean hasStatic(String mods) {
+	    return normalizeMods(mods).contains(" static ");
+	}
+
+
 }

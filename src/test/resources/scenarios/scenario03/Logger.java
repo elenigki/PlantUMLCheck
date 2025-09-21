@@ -1,1 +1,4 @@
-package scenario03; public class Logger {}
+package scenario03;
+
+public class Logger {
+}

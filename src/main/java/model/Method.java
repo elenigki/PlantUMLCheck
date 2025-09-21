@@ -8,6 +8,7 @@ public class Method {
     private ArrayList<String> parameters;
     //private boolean isAbstract;
     private String visibility; // - + #
+    private boolean isStatic;
     
     /*public Method(String name, String returnType, ArrayList<String> parameters, boolean isAbstract, String visibility) {
         this.name = name;
@@ -22,6 +23,7 @@ public class Method {
         this.returnType = returnType;
         this.parameters = parameters;
         this.visibility = visibility;
+        this. isStatic = false;
     
     /*public boolean isAbstract() {
         return isAbstract;*/
@@ -32,6 +34,7 @@ public class Method {
         this.returnType = returnType;
         this.parameters = new ArrayList<String>();
         this.visibility = visibility;
+        this.isStatic = false;
     }
 
 	public String getName() {
@@ -62,6 +65,14 @@ public class Method {
     public void addParameter(String parameter) {
     	parameters.add(parameter);
     }
+
+	public boolean isStatic() {
+		return isStatic;
+	}
+
+	public void setStatic(boolean isStatic) {
+		this.isStatic = isStatic;
+	}
 
 }
 

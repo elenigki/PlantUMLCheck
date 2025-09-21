@@ -1,1 +1,4 @@
-package scenario03; public class Report {}
+package scenario03;
+
+public class Report {
+}

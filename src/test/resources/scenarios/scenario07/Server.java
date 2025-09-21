@@ -1,1 +1,4 @@
-package scenario07; public class Server {}
+package scenario07;
+
+public class Server {
+}

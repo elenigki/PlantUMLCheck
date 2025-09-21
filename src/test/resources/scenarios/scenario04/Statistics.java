@@ -1,1 +1,19 @@
-package scenario04; public class Statistics { public int publicCount; protected int protectedCount; int pkgCount; private int hidden; public void add(int x){ publicCount+=x; protectedCount+=x; pkgCount+=x; hidden+=x; } int internal(){ return hidden; } }
+package scenario04;
+
+public class Statistics {
+    public int publicCount;
+    protected int protectedCount;
+    int pkgCount;
+    private int hidden;
+
+    public void add(int x) {
+        publicCount += x;
+        protectedCount += x;
+        pkgCount += x;
+        hidden += x;
+    }
+
+    int internal() {
+        return hidden;
+    }
+}

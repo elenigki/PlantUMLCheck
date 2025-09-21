@@ -347,58 +347,63 @@ public class PlantUMLParser {
 	}
 
 
-	// Handles attribute declarations in various UML styles.
+	// Handles attribute declarations in various UML styles, supports __...__ static wrapper
 	private boolean parseAttribute(String line, ClassInfo currentClass) {
-	    // Normalize and strip trailing semicolon if present
+	    // Detect and strip __...__ wrapper to mark static
+	    boolean isStatic = false;
 	    String src = line.trim();
+	    if (src.startsWith("__") && src.endsWith("__") && src.length() >= 4) {
+	        isStatic = true;
+	        src = src.substring(2, src.length() - 2).trim();
+	    }
 
-	    // Common char classes
-	    // Type can include package dots, generics <>, arrays [], wildcard ?, and $
-	    String TYPE = "([\\w.$<>\\[\\]?]+)";
-	    String NAME = "([A-Za-z_\\$][A-Za-z0-9_\\$]*)";
-	    // Optional initializer (ignored)
-	    String OPT_INIT = "(?:\\s*=\\s*[^;]+)?";
-	    String OPT_SEMI_END = "\\s*;?\\s*";
-
-	    // 1) visibility + Type name    e.g. "+ String name"
-	    Pattern visTypeName = Pattern.compile("^([+\\-#~])\\s*" + TYPE + "\\s+" + NAME + OPT_INIT + OPT_SEMI_END + "$");
+	    // 1) visibility + Type name   e.g. "+ String name", "- int age"
+	    Pattern visTypeName = Pattern.compile("^([-+#])?\\s*([\\w<>.\\[\\]]+)\\s+(\\w+)\\s*;?$");
 	    Matcher m = visTypeName.matcher(src);
 	    if (m.find()) {
-	        String visibility = m.group(1);
+	        String visibility = m.group(1) == null ? "" : m.group(1);
 	        String type = m.group(2);
 	        String name = m.group(3);
-	        currentClass.addAttribute(new Attribute(name, type, visibility));
+	        Attribute attr = new Attribute(name, type, visibility);
+	        attr.setStatic(isStatic);
+	        currentClass.addAttribute(attr);
 	        return true;
 	    }
 
-	    // 2) visibility + name : Type  e.g. "- name : String"
-	    Pattern visNameColonType = Pattern.compile("^([+\\-#~])\\s*" + NAME + "\\s*:\\s*" + TYPE + OPT_INIT + OPT_SEMI_END + "$");
+	    // 2) visibility + name : Type e.g. "- name : String", "+ age : int"
+	    Pattern visNameColonType = Pattern.compile("^([-+#])\\s*(\\w+)\\s*:\\s*([\\w<>.\\[\\]]+)\\s*;?$");
 	    m = visNameColonType.matcher(src);
 	    if (m.find()) {
 	        String visibility = m.group(1);
 	        String name = m.group(2);
 	        String type = m.group(3);
-	        currentClass.addAttribute(new Attribute(name, type, visibility));
+	        Attribute attr = new Attribute(name, type, visibility);
+	        attr.setStatic(isStatic);
+	        currentClass.addAttribute(attr);
 	        return true;
 	    }
 
-	    // 3) name : Type               e.g. "name : String"
-	    Pattern nameColonType = Pattern.compile("^" + NAME + "\\s*:\\s*" + TYPE + OPT_INIT + OPT_SEMI_END + "$");
+	    // 3) name : Type              e.g. "name : String"
+	    Pattern nameColonType = Pattern.compile("^(\\w+)\\s*:\\s*([\\w<>.\\[\\]]+)\\s*;?$");
 	    m = nameColonType.matcher(src);
 	    if (m.find()) {
 	        String name = m.group(1);
 	        String type = m.group(2);
-	        currentClass.addAttribute(new Attribute(name, type, ""));
+	        Attribute attr = new Attribute(name, type, "");
+	        attr.setStatic(isStatic);
+	        currentClass.addAttribute(attr);
 	        return true;
 	    }
 
-	    // 4) Type name                 e.g. "String name"
-	    Pattern typeName = Pattern.compile("^" + TYPE + "\\s+" + NAME + OPT_INIT + OPT_SEMI_END + "$");
+	    // 4) Type name                e.g. "String name"
+	    Pattern typeName = Pattern.compile("^([\\w<>.\\[\\]]+)\\s+(\\w+)\\s*;?$");
 	    m = typeName.matcher(src);
 	    if (m.find()) {
 	        String type = m.group(1);
 	        String name = m.group(2);
-	        currentClass.addAttribute(new Attribute(name, type, ""));
+	        Attribute attr = new Attribute(name, type, "");
+	        attr.setStatic(isStatic);
+	        currentClass.addAttribute(attr);
 	        return true;
 	    }
 
@@ -406,61 +411,76 @@ public class PlantUMLParser {
 	}
 
 
-	// Handles method declarations with or without visibility and return type.
+
+	// Handles method declarations with or without visibility and return type, with optional __...__ static wrapper
 	private boolean parseMethod(String line, ClassInfo currentClass) {
+	    // Detect and strip __...__ wrapper to mark static
+	    boolean isStatic = false;
+	    String src = line.trim();
+	    Matcher staticWrap = Pattern.compile("^__\\s*(.*?)\\s*__$").matcher(src);
+	    if (staticWrap.find()) {
+	        isStatic = true;
+	        src = staticWrap.group(1).trim(); // inner method text
+	    }
+
 	    // 1) Original style: "+ doThing(int, String) : void"
 	    //    (kept first so existing diagrams keep working)
 	    Matcher m1 = Pattern.compile(
-	        "^([-+#])?\\s*(\\w+)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w<>\\[\\]., ]+))?$"
-	    ).matcher(line);
+	        "^([-+#~])?\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*(?::\\s*([\\w.$<>\\[\\]., ?]+))?$"
+	    ).matcher(src);
 	    if (m1.find()) {
 	        String visibility = m1.group(1) == null ? "" : m1.group(1);
 	        String name       = m1.group(2);
 	        String paramsRaw  = m1.group(3);
 	        String returnType = m1.group(4) == null ? "void" : m1.group(4).trim();
 
-	        // Skip constructors (method name equals class name)
+	        // Skip constructors
 	        if (name.equals(currentClass.getName())) {
 	            return true; // consume but do not add
 	        }
 
 	        ArrayList<String> paramList = new ArrayList<>();
-	        if (!paramsRaw.isEmpty()) {
+	        if (paramsRaw != null && !paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                paramList.add(p.trim());
+	                if (!p.isEmpty()) paramList.add(p.trim());
 	            }
 	        }
-	        currentClass.addMethod(new Method(name, returnType, paramList, visibility));
+	        Method method = new Method(name, returnType, paramList, visibility);
+	        method.setStatic(isStatic);
+	        currentClass.addMethod(method);
 	        return true;
 	    }
 
 	    // 2) Java-like style: "+ void service()", "+ List<String> findAll()"
 	    Matcher m2 = Pattern.compile(
-	        "^([-+#])?\\s*([\\w<>\\[\\]., ]+)\\s+(\\w+)\\s*\\((.*?)\\)\\s*;?$"
-	    ).matcher(line);
+	        "^([-+#~])?\\s*([\\w.$<>\\[\\]., ?]+)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\((.*?)\\)\\s*;?$"
+	    ).matcher(src);
 	    if (m2.find()) {
 	        String visibility = m2.group(1) == null ? "" : m2.group(1);
 	        String returnType = m2.group(2).trim();
 	        String name       = m2.group(3);
 	        String paramsRaw  = m2.group(4);
 
-	        // Skip constructors (method name equals class name)
+	        // Skip constructors
 	        if (name.equals(currentClass.getName())) {
 	            return true; // consume but do not add
 	        }
 
 	        ArrayList<String> paramList = new ArrayList<>();
-	        if (!paramsRaw.isEmpty()) {
+	        if (paramsRaw != null && !paramsRaw.isEmpty()) {
 	            for (String p : paramsRaw.split("\\s*,\\s*")) {
-	                paramList.add(p.trim());
+	                if (!p.isEmpty()) paramList.add(p.trim());
 	            }
 	        }
-	        currentClass.addMethod(new Method(name, returnType, paramList, visibility));
+	        Method method = new Method(name, returnType, paramList, visibility);
+	        method.setStatic(isStatic);
+	        currentClass.addMethod(method);
 	        return true;
 	    }
 
 	    return false;
 	}
+
 
 
 

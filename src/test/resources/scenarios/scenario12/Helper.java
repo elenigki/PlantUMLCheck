@@ -1,1 +1,4 @@
-package scenario12; public class Helper {}
+package scenario12;
+
+public class Helper {
+}

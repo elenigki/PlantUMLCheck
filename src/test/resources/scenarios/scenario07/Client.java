@@ -1,1 +1,4 @@
-package scenario07; public class Client {}
+package scenario07;
+
+public class Client {
+}

@@ -537,6 +537,119 @@ public class PlatnUMLParserTest {
 	    assertFalse(person.getMethods().stream().anyMatch(m -> m.getName().equals("Person")),
 	        "Constructor should be ignored");
 	}
+	
+	@Test
+	public void testStaticAttributeAndMethodWrappedWithUnderscores() throws IOException {
+	    String uml = "@startuml\n" +
+	                 "class Logger {\n" +
+	                 "  __counter : int__\n" +            // static attribute
+	                 "  __getInstance() : Logger__\n" +   // static method
+	                 "}\n" +
+	                 "@enduml";
+
+	    File f = tempPUML(uml);
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+
+	    ClassInfo logger = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Logger"))
+	        .findFirst().orElseThrow();
+
+	    // Attribute assertions
+	    Attribute counter = logger.getAttributes().stream()
+	        .filter(a -> a.getName().equals("counter"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Static attribute 'counter' not parsed"));
+	    assertEquals("int", counter.getType());
+	    assertTrue(counter.isStatic(), "Attribute 'counter' should be static");
+
+	    // Method assertions
+	    Method getInstance = logger.getMethods().stream()
+	        .filter(m -> m.getName().equals("getInstance"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Static method 'getInstance' not parsed"));
+	    assertEquals("Logger", getInstance.getReturnType());
+	    assertTrue(getInstance.isStatic(), "Method 'getInstance' should be static");
+	    assertTrue(getInstance.getParameters().isEmpty(), "Expected no parameters for getInstance()");
+	}
+
+	@Test
+	public void testStaticAttributesAndMethodsKeepNamesWithoutUnderscores() throws IOException {
+	    String uml = "@startuml\n" +
+	                 "class Config {\n" +
+	                 "  __VERSION : String__\n" +            // static attribute
+	                 "  path : String\n" +                   // normal attribute
+	                 "  __loadDefaults() : void__\n" +       // static method
+	                 "  save(file : String) : void\n" +      // normal method
+	                 "}\n" +
+	                 "@enduml";
+
+	    File f = tempPUML(uml);
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+
+	    ClassInfo config = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Config"))
+	        .findFirst().orElseThrow();
+
+	    Attribute version = config.getAttributes().stream()
+	        .filter(a -> a.getName().equals("VERSION"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Static attribute 'VERSION' not found"));
+	    assertEquals("String", version.getType());
+	    assertTrue(version.isStatic(), "VERSION should be marked static");
+
+	    Attribute path = config.getAttributes().stream()
+	        .filter(a -> a.getName().equals("path"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Attribute 'path' not found"));
+	    assertEquals("String", path.getType());
+	    assertFalse(path.isStatic(), "path should not be static");
+
+	    Method loadDefaults = config.getMethods().stream()
+	        .filter(m -> m.getName().equals("loadDefaults"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Static method 'loadDefaults' not found"));
+	    assertEquals("void", loadDefaults.getReturnType());
+	    assertTrue(loadDefaults.isStatic(), "loadDefaults should be marked static");
+
+	    Method save = config.getMethods().stream()
+	        .filter(m -> m.getName().equals("save"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Method 'save' not found"));
+	    assertEquals("void", save.getReturnType());
+	    assertFalse(save.isStatic(), "save should not be static");
+	}
+
+	@Test
+	public void testConstructorsAreIgnoredEvenWhenWrappedStatic() throws IOException {
+	    String uml = "@startuml\n" +
+	                 "class Person {\n" +
+	                 "  __Person()__\n" +                    // constructor, wrapped → must be ignored
+	                 "  __Person(String name)__\n" +          // constructor with param, wrapped → ignored
+	                 "  __ID : int__\n" +                     // static attribute
+	                 "  getName() : String\n" +               // normal method
+	                 "}\n" +
+	                 "@enduml";
+
+	    File f = tempPUML(uml);
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+
+	    ClassInfo person = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Person"))
+	        .findFirst().orElseThrow();
+
+	    // Constructors must not appear as methods
+	    assertFalse(person.getMethods().stream().anyMatch(m -> m.getName().equals("Person")),
+	        "Constructors should be ignored even when wrapped with __...__");
+
+	    // Normal method present
+	    Method getName = person.getMethods().stream()
+	        .filter(m -> m.getName().equals("getName"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Method 'getName' not parsed"));
+	    assertEquals("String", getName.getReturnType());
+	    assertFalse(getName.isStatic(), "getName should not be static");
+
+	    // Static attribute present and marked
+	    Attribute id = person.getAttributes().stream()
+	        .filter(a -> a.getName().equals("ID"))
+	        .findFirst().orElseThrow(() -> new AssertionError("Static attribute 'ID' not parsed"));
+	    assertEquals("int", id.getType());
+	    assertTrue(id.isStatic(), "ID should be static");
+	}
+
 
 
 
