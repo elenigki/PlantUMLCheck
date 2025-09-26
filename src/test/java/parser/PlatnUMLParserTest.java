@@ -650,6 +650,39 @@ public class PlatnUMLParserTest {
 	    assertEquals("int", id.getType());
 	    assertTrue(id.isStatic(), "ID should be static");
 	}
+	
+	@Test
+	public void testMethodParametersNormalizedToTypesOnly() throws Exception {
+	    String uml =
+	        "@startuml\n" +
+	        "class Demo {\n" +
+	        "  + m1(num : int, text : String) : void\n" +   // name : type
+	        "  + m2(int count, String label) : void\n" +   // type name
+	        "  + m3(int, List<String>) : void\n" +         // type only
+	        "}\n" +
+	        "@enduml\n";
+
+	    File f = tempPUML(uml);
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+
+	    ClassInfo demo = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Demo"))
+	        .findFirst().orElseThrow();
+
+	    Method m1 = demo.getMethods().stream().filter(m -> m.getName().equals("m1")).findFirst().orElseThrow();
+	    Method m2 = demo.getMethods().stream().filter(m -> m.getName().equals("m2")).findFirst().orElseThrow();
+	    Method m3 = demo.getMethods().stream().filter(m -> m.getName().equals("m3")).findFirst().orElseThrow();
+
+	    // m1: both parameters should be reduced to just types
+	    assertEquals(List.of("int", "String"), m1.getParameters());
+
+	    // m2: also just types
+	    assertEquals(List.of("int", "String"), m2.getParameters());
+
+	    // m3: complex types preserved
+	    assertEquals(List.of("int", "List<String>"), m3.getParameters());
+	}
+
 
 
 

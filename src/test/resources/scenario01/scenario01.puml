@@ -1,16 +1,16 @@
 @startuml
 class CardGateway {
-  + pay(double) : void
+  + pay(amount : double) : void
 }
 class Customer {
   - order : Order
-  + setOrder(Order) : void
+  + setOrder(order : Order) : void
   + getOrder() : Order
 }
 class Order {
 }
 interface PaymentGateway {
-  + pay(amount: double) : void
+  + pay(amount : double) : void
 }
 PaymentGateway <|.. CardGateway
 Customer o-- Order

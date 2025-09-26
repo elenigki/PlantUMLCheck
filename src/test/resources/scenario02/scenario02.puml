@@ -1,0 +1,8 @@
+@startuml
+class Library {
+  - book : Book
+}
+class Book {
+}
+Library --> Book
+@enduml

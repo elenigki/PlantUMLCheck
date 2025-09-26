@@ -1,0 +1,6 @@
+@startuml
+class Account {
+}
+class Profile {
+}
+@enduml

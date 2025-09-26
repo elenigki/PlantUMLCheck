@@ -72,45 +72,45 @@ public final class RelationshipCheck {
         boolean codeReal = has(codeEdges, RelationshipType.REALIZATION);
         boolean umlReal  = has(umlEdges, RelationshipType.REALIZATION);
 
-        // GENERALIZATION
+        // GENERALIZATION (extends)
         if (codeGen && !umlGen) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    a + " -> " + b,
-                    "Missing GENERALIZATION in UML",
-                    "missing", "GENERALIZATION",
-                    "Add extends edge to UML"
+                IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.WARNING,
+                a + " -> " + b,
+                "Inheritance: expected GENERALIZATION; UML is missing it",
+                "missing", "GENERALIZATION",
+                "Add extends edge to UML"
             ));
         } else if (!codeGen && umlGen) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISSING_IN_CODE,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    a + " -> " + b,
-                    "GENERALIZATION present in UML but not in code",
-                    "GENERALIZATION", "missing",
-                    "Remove or fix extends in UML"
+                IssueKind.RELATIONSHIP_MISSING_IN_CODE,
+                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                a + " -> " + b,
+                "Inheritance: UML shows GENERALIZATION; code has none",
+                "GENERALIZATION", "missing",
+                "Remove or fix extends in UML"
             ));
         }
 
-        // REALIZATION
+        // REALIZATION (implements)
         if (codeReal && !umlReal) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    a + " -> " + b,
-                    "Missing REALIZATION in UML",
-                    "missing", "REALIZATION",
-                    "Add implements edge to UML"
+                IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.WARNING,
+                a + " -> " + b,
+                "Inheritance: expected REALIZATION; UML is missing it",
+                "missing", "REALIZATION",
+                "Add implements edge to UML"
             ));
         } else if (!codeReal && umlReal) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISSING_IN_CODE,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    a + " -> " + b,
-                    "REALIZATION present in UML but not in code",
-                    "REALIZATION", "missing",
-                    "Remove or fix implements in UML"
+                IssueKind.RELATIONSHIP_MISSING_IN_CODE,
+                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                a + " -> " + b,
+                "Inheritance: UML shows REALIZATION; code has none",
+                "REALIZATION", "missing",
+                "Remove or fix implements in UML"
             ));
         }
     }
@@ -132,29 +132,29 @@ public final class RelationshipCheck {
         // only UML has ownership
         if (codeOwn == null && umlOwn != null) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISMATCH,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    where,
-                    "UML shows ownership but code does not",
-                    umlOwn.name(), "missing",
-                    "Downgrade/remove UML ownership or reflect it in code"
+                IssueKind.RELATIONSHIP_MISMATCH,
+                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                where,
+                "Ownership: UML shows " + umlOwn.name() + " but code has none",
+                umlOwn.name(), "missing",
+                "Remove from UML or reflect it in code"
             ));
             return;
         }
 
-     // only code has ownership
+        // only code has ownership
         if (codeOwn != null && umlOwn == null) {
-            // NEW: if UML has a DEPENDENCY, let the dependency check handle it (avoid duplicate)
+            // If UML also has a DEPENDENCY, let the dependency check handle it (avoid duplicate)
             boolean umlHasDependency = has(umlEdges, RelationshipType.DEPENDENCY);
             if (umlHasDependency) return;
 
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISSING_IN_UML,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    where,
-                    "Code shows ownership but UML is missing it",
-                    "missing", codeOwn.name(),
-                    "Add ownership to UML"
+                IssueKind.RELATIONSHIP_MISSING_IN_UML,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.WARNING,
+                where,
+                "Ownership: expected " + codeOwn.name() + "; UML is missing it",
+                "missing", codeOwn.name(),
+                "Add ownership to UML"
             ));
             return;
         }
@@ -164,27 +164,27 @@ public final class RelationshipCheck {
         int u = strength(umlOwn);
         if (c > u) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISMATCH,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    where,
-                    "UML is weaker than code (ownership)",
-                    umlOwn.name(), codeOwn.name(),
-                    "Upgrade UML ownership to match code"
+                IssueKind.RELATIONSHIP_MISMATCH,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.WARNING,
+                where,
+                "Ownership: expected " + codeOwn.name() + "; UML has " + umlOwn.name(),
+                umlOwn.name(), codeOwn.name(),
+                "Upgrade UML ownership to match code"
             ));
         } else if (c < u) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISMATCH,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    where,
-                    "UML is stronger than code (ownership)",
-                    umlOwn.name(), codeOwn.name(),
-                    "Downgrade UML ownership to match code"
+                IssueKind.RELATIONSHIP_MISMATCH,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.WARNING,
+                where,
+                "Ownership: expected " + codeOwn.name() + "; UML has " + umlOwn.name(),
+                umlOwn.name(), codeOwn.name(),
+                "Downgrade UML ownership to match code"
             ));
         }
-        // if equal → OK (extra weaker UML edges would be an improvement; we can add later if you want)
+        // equal → OK
     }
 
-    /** Handles dependency policy (always advisory). */
+    /** Handles dependency policy. */
     static void compareDependencyBetween(String a, String b,
                                          List<Relationship> codeEdges,
                                          List<Relationship> umlEdges,
@@ -198,32 +198,33 @@ public final class RelationshipCheck {
 
         String where = a + " -> " + b;
 
-        // If UML has only dependency but code has stronger → underclaimed
+        // UML has only dependency but code has stronger → underclaimed
         if (umlDep && codeOwn != null) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISMATCH,
-                    mode == CheckMode.STRICT ? IssueLevel.ERROR : IssueLevel.WARNING,
-                    where,
-                    "UML shows DEPENDENCY but code shows stronger relation",
-                    "DEPENDENCY", codeOwn.name(),
-                    "Upgrade UML to " + codeOwn.name()
+                IssueKind.RELATIONSHIP_MISMATCH,
+                (mode == CheckMode.STRICT) ? IssueLevel.ERROR : IssueLevel.SUGGESTION,
+                where,
+                "Dependency: expected " + codeOwn.name() + "; UML has DEPENDENCY",
+                "DEPENDENCY", codeOwn.name(),
+                "Upgrade UML to " + codeOwn.name()
             ));
             return;
         }
 
-        // Dependency only (no stronger in code or UML) → advisory/noise
-        if (umlDep && codeOwn == null) {
+        // UML-only dependency (no stronger in code and code has no dependency) → ERROR in all modes
+        if (umlDep && codeOwn == null && !codeDep) {
             out.add(new Difference(
-                    IssueKind.RELATIONSHIP_MISMATCH,
-                    IssueLevel.SUGGESTION,
-                    where,
-                    "Dependency may be noise",
-                    "DEPENDENCY", "—",
-                    "Consider removing or replacing with a stronger relation if intended"
+                IssueKind.RELATIONSHIP_MISMATCH,
+                IssueLevel.ERROR,
+                where,
+                "Dependency: UML shows DEPENDENCY; code has none",
+                "DEPENDENCY", "missing",
+                "Remove or reflect a stronger intended relation in code"
             ));
+            return;
         }
 
-        // Code-only dependency (UML omitted) → OK in both modes (dependencies optional)
+        // Code-only dependency (UML omitted) → OK (ignored) in all modes
         // Intentionally no difference emitted
     }
 

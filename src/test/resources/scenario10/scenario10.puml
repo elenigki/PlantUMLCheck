@@ -1,0 +1,9 @@
+@startuml
+class Computer {
+  - cpu : Cpu
+}
+class Cpu {
+}
+Computer *-- Cpu
+Computer --> Cpu
+@enduml

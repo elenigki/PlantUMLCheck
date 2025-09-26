@@ -1,0 +1,8 @@
+@startuml
+class Config {
+  + __db : Database__
+}
+class Database {
+}
+Config *-- Database
+@enduml

@@ -3,113 +3,150 @@ package comparison.report;
 import comparison.CheckMode;
 import comparison.issues.Difference;
 import comparison.issues.IssueLevel;
-import comparison.issues.IssueKind;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-/** Turns differences into simple text or markdown. */
+/** Turns differences into simple text or markdown with "Expected X; UML has Y" phrasing. */
 public final class ReportPrinter {
     private ReportPrinter() {}
 
-    // Prints a plain text report
+    private static final List<IssueLevel> SEVERITY_ORDER =
+            List.of(IssueLevel.ERROR, IssueLevel.WARNING, IssueLevel.SUGGESTION, IssueLevel.INFO);
+
+    // -------- Plain text --------
     public static String toText(List<Difference> diffs, CheckMode mode) {
+        if (diffs == null) diffs = List.of();
+
+        Map<IssueLevel, List<Difference>> byLevel = diffs.stream()
+                .collect(Collectors.groupingBy(Difference::getLevel));
+
+        String nl = System.lineSeparator();
         StringBuilder sb = new StringBuilder();
-        sb.append("UML Consistency Report").append("\n");
-        sb.append("Mode: ").append(mode).append("\n");
-        sb.append("Total: ").append(n(diffs.size())).append("\n\n");
+        sb.append("UML ↔ Code Consistency Report").append(nl);
+        sb.append("Mode: ").append(mode).append(nl);
 
-        Map<IssueLevel, List<Difference>> byLevel = groupByLevel(diffs);
+        int errors = byLevel.getOrDefault(IssueLevel.ERROR, List.of()).size();
+        int warns  = byLevel.getOrDefault(IssueLevel.WARNING, List.of()).size();
+        int suggs  = byLevel.getOrDefault(IssueLevel.SUGGESTION, List.of()).size();
+        int infos  = byLevel.getOrDefault(IssueLevel.INFO, List.of()).size();
 
-        for (IssueLevel level : sortedLevels()) {
-            List<Difference> list = byLevel.getOrDefault(level, List.of());
-            if (list.isEmpty()) continue;
-            sb.append(level.name()).append(" (").append(list.size()).append(")").append("\n");
-            for (Difference d : sort(list)) {
-                sb.append(" - ").append(oneLine(d)).append("\n");
+        sb.append(String.format("Summary: %d ERROR, %d WARNING, %d SUGGESTION, %d INFO",
+                errors, warns, suggs, infos)).append(nl);
+        sb.append("Pass: ").append(errors == 0 ? "YES" : "NO").append(nl).append(nl);
+
+        for (IssueLevel level : SEVERITY_ORDER) {
+            List<Difference> group = new ArrayList<>(byLevel.getOrDefault(level, List.of()));
+            if (group.isEmpty()) continue;
+
+            sb.append("[").append(level).append("]").append(nl);
+            group.sort(Comparator.comparing(Difference::getWhere)
+                                 .thenComparing(d -> d.getKind().name()));
+            for (Difference d : group) {
+                sb.append(" - ").append(d.getWhere())
+                  .append(" :: ").append(d.getKind())
+                  .append(" :: ").append(d.getSummary());
+
+                // friendlier detail
+                sb.append(" | ").append(phrased(d));
+
+                if (nz(d.getTip())) {
+                    sb.append(" | TIP: ").append(d.getTip());
+                }
+                sb.append(nl);
             }
-            sb.append("\n");
+            sb.append(nl);
         }
-        if (diffs.isEmpty()) sb.append("✔ UML passed the check.\n");
         return sb.toString();
     }
 
-    // Prints a markdown report
+    // -------- Markdown --------
     public static String toMarkdown(List<Difference> diffs, CheckMode mode) {
+        if (diffs == null) diffs = List.of();
+        Map<IssueLevel, List<Difference>> byLevel = diffs.stream()
+                .collect(Collectors.groupingBy(Difference::getLevel));
+
         StringBuilder sb = new StringBuilder();
-        sb.append("# UML Consistency Report\n\n");
-        sb.append("**Mode:** ").append(mode).append("  \n");
-        sb.append("**Total issues:** ").append(diffs.size()).append("\n\n");
+        sb.append("# UML ↔ Code Consistency Report\n");
+        sb.append("**Mode:** ").append(mode).append("\n\n");
 
-        Map<IssueLevel, List<Difference>> byLevel = groupByLevel(diffs);
+        int errors = byLevel.getOrDefault(IssueLevel.ERROR, List.of()).size();
+        int warns  = byLevel.getOrDefault(IssueLevel.WARNING, List.of()).size();
+        int suggs  = byLevel.getOrDefault(IssueLevel.SUGGESTION, List.of()).size();
+        int infos  = byLevel.getOrDefault(IssueLevel.INFO, List.of()).size();
 
-        for (IssueLevel level : sortedLevels()) {
-            List<Difference> list = byLevel.getOrDefault(level, List.of());
-            if (list.isEmpty()) continue;
+        sb.append(String.format("**Summary:** %d ERROR, %d WARNING, %d SUGGESTION, %d INFO  \n",
+                errors, warns, suggs, infos));
+        sb.append("**Pass:** ").append(errors == 0 ? "✅ YES" : "❌ NO").append("\n\n");
 
-            sb.append("## ").append(level.name()).append(" (").append(list.size()).append(")\n\n");
-            sb.append("| Where | Kind | Summary | UML | Code | Tip |\n");
-            sb.append("|---|---|---|---|---|---|\n");
-            for (Difference d : sort(list)) {
+        for (IssueLevel level : SEVERITY_ORDER) {
+            List<Difference> group = new ArrayList<>(byLevel.getOrDefault(level, List.of()));
+            if (group.isEmpty()) continue;
+
+            sb.append("## ").append(level).append("\n\n");
+            sb.append("| Where | Kind | Summary | Detail | Tip |\n");
+            sb.append("|---|---|---|---|---|\n");
+            group.sort(Comparator.comparing(Difference::getWhere)
+                                 .thenComparing(d -> d.getKind().name()));
+            for (Difference d : group) {
                 sb.append("| ")
                   .append(escape(d.getWhere())).append(" | ")
                   .append(escape(d.getKind().name())).append(" | ")
                   .append(escape(d.getSummary())).append(" | ")
-                  .append(escape(nv(d.getUml()))).append(" | ")
-                  .append(escape(nv(d.getCode()))).append(" | ")
-                  .append(escape(nv(d.getTip()))).append(" |\n");
+                  .append(escape(phrased(d))).append(" | ")
+                  .append(escape(z(d.getTip()))).append(" |\n");
             }
             sb.append("\n");
-        }
-
-        if (diffs.isEmpty()) {
-            sb.append("> ✅ UML passed the check.\n");
         }
         return sb.toString();
     }
 
-    // --- tiny helpers ---
+    // --- friendlier detail line ---
+    private static String phrased(Difference d) {
+        String u = z(d.getUml());
+        String c = z(d.getCode());
+        boolean umlMissing  = "missing".equalsIgnoreCase(u);
+        boolean codeMissing = "missing".equalsIgnoreCase(c);
 
-    private static String oneLine(Difference d) {
-        // e.g. "Customer.attr:email — ATTRIBUTE_MISMATCH — Attribute type mismatch — UML:String | CODE:double"
-        return d.getWhere() + " — " + d.getKind() + " — " + d.getSummary()
-                + " — UML:" + nv(d.getUml()) + " | CODE:" + nv(d.getCode());
+        switch (d.getKind()) {
+            case RELATIONSHIP_MISMATCH:
+                if (!umlMissing && !codeMissing) {
+                    return "Expected " + c + "; UML has " + u;
+                } else if (umlMissing && !codeMissing) {
+                    return "Expected " + c + "; UML is missing it";
+                } else if (!umlMissing && codeMissing) {
+                    return "UML shows " + u + "; code has none";
+                }
+                break;
+
+            case RELATIONSHIP_MISSING_IN_UML:
+                return "Expected " + c + "; UML is missing it";
+
+            case RELATIONSHIP_MISSING_IN_CODE:
+                return "UML shows " + u + "; code has none";
+
+            case ATTRIBUTE_MISMATCH:
+            case METHOD_MISMATCH:
+                if (!"—".equals(u) && !"—".equals(c)) {
+                    return "Expected " + c + "; UML has " + u;
+                } else if ("—".equals(u) && !"—".equals(c)) {
+                    return "UML omits a detail; code is " + c;
+                } else if (!"—".equals(u) && "—".equals(c)) {
+                    return "UML specifies " + u + "; code has none";
+                }
+                break;
+
+            default:
+                // generic
+        }
+        return "Expected " + c + "; UML has " + u;
     }
 
-    private static Map<IssueLevel, List<Difference>> groupByLevel(List<Difference> diffs) {
-        return diffs.stream().collect(Collectors.groupingBy(Difference::getLevel, Collectors.toList()));
-    }
-
-    private static List<Difference> sort(List<Difference> in) {
-        return in.stream()
-                .sorted(Comparator
-                        .comparing(Difference::getKind, Comparator.comparing(Enum::name))
-                        .thenComparing(Difference::getWhere))
-                .collect(Collectors.toList());
-    }
-
-    private static List<IssueLevel> sortedLevels() {
-        // order: ERROR, WARNING, INFO, SUGGESTION
-        return List.of(IssueLevel.ERROR, IssueLevel.WARNING, IssueLevel.INFO, IssueLevel.SUGGESTION);
-    }
-
-    private static String nv(String s) { return (s == null || s.isBlank()) ? "—" : s.trim(); }
-    private static String n(int i) { return String.valueOf(i); }
+    // --- utils ---
+    private static boolean nz(String s) { return s != null && !s.isBlank(); }
+    private static String z(String s) { return nz(s) ? s.trim() : "—"; }
     private static String escape(String s) {
         if (s == null) return "—";
-        return s.replace("|","\\|");
+        return s.replace("|", "\\|");
     }
-    
-    /***
-     * Example usage (CLI or test)
-      ModelComparator cmp = new ModelComparator(CheckMode.RELAXED);
-		List<Difference> diffs = cmp.compare(codeModel, umlModel);
-
-		System.out.println(ReportPrinter.toText(diffs, CheckMode.RELAXED));
-		// or
-		String md = ReportPrinter.toMarkdown(diffs, CheckMode.RELAXED);
-		// write md to a file if you like
-
-     * 
-     */
 }

@@ -1,0 +1,6 @@
+@startuml
+class Box {
+  + size : int
+  + setSize(s : int) : void
+}
+@enduml

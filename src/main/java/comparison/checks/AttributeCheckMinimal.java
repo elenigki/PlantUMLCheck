@@ -17,6 +17,7 @@ import java.util.*;
  * - If UML WRITES a detail and it differs => ERROR.
  * - If UML OMITS a detail => SUGGESTION (or INFO for non-API).
  * - Name must match exactly when present (no fuzzy).
+ * - Static: if UML writes it, it must match; if omitted and code is static => SUGGESTION.
  */
 public final class AttributeCheckMinimal {
 
@@ -40,7 +41,7 @@ public final class AttributeCheckMinimal {
             Attribute U = um.get(name);
             Attribute C = cm.get(name);
 
-            String where = className + "#" + name;
+            String where = className + ".attr:" + name;
 
             if (C == null) {
                 out.add(new Difference(
@@ -53,7 +54,7 @@ public final class AttributeCheckMinimal {
                 continue;
             }
 
-            // Type
+            // ---- Type
             String ut = ns(U.getType());
             String ct = ns(C.getType());
             if (!ut.isEmpty()) {
@@ -76,26 +77,53 @@ public final class AttributeCheckMinimal {
                 ));
             }
 
-            // Visibility (written vs omitted)
-            String uVis = VisibilityRules.vis(U.getVisibility());
+         // ---- Visibility (directional)
             String cVis = VisibilityRules.vis(C.getVisibility());
-            if (!uVis.equals("~")) {
-                if (!VisibilityRules.equalStrict(uVis, cVis)) {
-                    out.add(new Difference(
-                            IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.WARNING,
-                            where,
-                            "Attribute visibility differs",
-                            uVis, cVis,
-                            "Match UML visibility to code (or omit visibility)"
-                    ));
-                }
-            } else {
+            if (omitted(U.getVisibility())) {
                 out.add(new Difference(
                         IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.SUGGESTION,
                         where,
                         "Attribute visibility omitted in UML",
                         "omitted", cVis,
                         "Optionally show the visibility"
+                ));
+            } else {
+                String uVis = VisibilityRules.vis(U.getVisibility());
+                int ur = rank(uVis), cr = rank(cVis);
+                if (ur > cr) {
+                    out.add(new Difference(
+                            IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.ERROR,
+                            where,
+                            "UML visibility is more restrictive than code",
+                            uVis, cVis,
+                            "Make UML at least as visible as the code"
+                    ));
+                } else if (ur < cr) {
+                    out.add(new Difference(
+                            IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.WARNING,
+                            where,
+                            "UML visibility is less restrictive than code",
+                            uVis, cVis,
+                            "Consider aligning UML visibility with code"
+                    ));
+                }
+            }
+
+
+            // ---- Static (expects Attribute.isStatic(): Boolean; UML may be null)
+            Boolean uStat = U.isStatic();      // may be null (omitted in UML)
+            Boolean cStat = C.isStatic();      // expected non-null true/false on code side
+            boolean codeStatic = Boolean.TRUE.equals(cStat);
+
+
+  
+            if (uStat.booleanValue() != codeStatic) {
+                out.add(new Difference(
+                        IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.ERROR,
+                        where,
+                        "Static modifier mismatch between UML and code",
+                        "static: " + uStat, "static: " + codeStatic,
+                        "Make UML static match the code"
                 ));
             }
         }
@@ -109,7 +137,7 @@ public final class AttributeCheckMinimal {
 
             out.add(new Difference(
                     IssueKind.ATTRIBUTE_MISSING_IN_UML, lvl,
-                    className + "#" + name,
+                    className + ".attr:" + name,
                     "Attribute missing in UML",
                     "missing", "present",
                     (lvl == IssueLevel.SUGGESTION) ? "Consider adding public/protected attribute to UML"
@@ -135,4 +163,20 @@ public final class AttributeCheckMinimal {
     }
 
     private static String ns(String s) { return (s == null || s.isBlank()) ? "" : s.trim(); }
+
+    // smaller is "more public": + (0) < # (1) < ~ (2) < - (3)
+    private static int rank(String v) {
+        if (v == null || v.isBlank()) return 4;
+        String t = v.trim();
+        return switch (t) {
+            case "+" -> 0;   // public
+            case "#" -> 1;   // protected
+            case "~" -> 2;   // package
+            case "-" -> 3;   // private
+            default -> 4;    // unknown/other
+        };
+    }
+    
+    private static boolean omitted(String v) { return v == null || v.trim().isEmpty(); }
+
 }

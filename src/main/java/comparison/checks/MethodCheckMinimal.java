@@ -15,9 +15,10 @@ import java.util.*;
 /**
  * MINIMAL member rules (formerly RELAXED_PLUS):
  * - If UML WRITES return/params and they differ -> ERROR.
- * - If UML OMITS return/params -> SUGGESTION (and never an error because it’s abstracting).
+ * - If UML OMITS return/params -> SUGGESTION (abstraction is allowed).
  * - Name must match exactly when present.
  * - Code-only methods: SUGGESTION for public/protected, INFO otherwise.
+ * - Static: if UML writes it, it must match; if omitted and code is static => SUGGESTION.
  */
 public final class MethodCheckMinimal {
 
@@ -39,6 +40,7 @@ public final class MethodCheckMinimal {
         Map<String, Method> codeBySig = bySignature(codeMethods);
         Map<String, Method> umlBySig  = bySignature(umlMethods);
 
+        // Track UML methods that specify only a name (params omitted)
         Set<String> umlNameOnly = new LinkedHashSet<>();
         for (Method u : umlMethods) {
             String name = safe(u.getName());
@@ -52,19 +54,19 @@ public final class MethodCheckMinimal {
         // --- UML -> Code
         for (Method U : umlMethods) {
             String name = safe(U.getName());
-            List<String> up = U.getParameters();
-            String where = className + "#" + (name.isEmpty() ? "—" : SignatureRules.signatureOf(U));
             if (name.isEmpty()) continue;
 
+            List<String> up = U.getParameters();
             boolean paramsOmitted = (up == null);
-            Method C = null;
 
             if (paramsOmitted) {
-                C = firstByName(codeMethods, name);
+                Method C = firstByName(codeMethods, name);
+                String whereNameOnly = className + "#" + name + "(…)";
+
                 if (C == null) {
                     out.add(new Difference(
                             IssueKind.METHOD_MISSING_IN_CODE, IssueLevel.ERROR,
-                            className + "#" + name + "(…)",
+                            whereNameOnly,
                             "Method name present in UML but not found in code",
                             "present", "missing",
                             "Remove from UML or add method in code"
@@ -72,64 +74,103 @@ public final class MethodCheckMinimal {
                     continue;
                 }
 
+                // Params omitted -> SUGGESTION
                 out.add(new Difference(
                         IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
-                        className + "#" + name + "(…)",
+                        whereNameOnly,
                         "Parameters omitted in UML",
                         "omitted", SignatureRules.signatureOf(C),
                         "Consider documenting parameter types/arity"
                 ));
 
+                // Return type handling when name-only (ambiguous overloads)
                 String uret = ns(U.getReturnType());
                 String cret = ns(C.getReturnType());
                 if (uret.isEmpty()) {
                     if (!cret.equals("void") && !cret.isEmpty()) {
                         out.add(new Difference(
                                 IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
-                                className + "#" + name + "(…)",
+                                whereNameOnly,
                                 "Return type omitted in UML",
                                 "omitted", cret,
                                 "Consider documenting the return type"
                         ));
                     }
-                } else {
-                    if (!TypeRules.equalStrict(uret, cret)) {
-                        out.add(new Difference(
-                                IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
-                                className + "#" + name + "(…)",
-                                "UML return type may not match every overload",
-                                uret, cret,
-                                "Prefer omitting or matching a specific overload"
-                        ));
-                    }
-                }
-
-                String uVis = VisibilityRules.vis(U.getVisibility());
-                String cVis = VisibilityRules.vis(C.getVisibility());
-                if (!uVis.equals("~")) {
-                    if (!VisibilityRules.equalStrict(uVis, cVis)) {
-                        out.add(new Difference(
-                                IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
-                                className + "#" + name + "(…)",
-                                "Method visibility differs",
-                                uVis, cVis,
-                                "Match UML visibility to code or omit visibility"
-                        ));
-                    }
-                } else {
+                } else if (!TypeRules.equalStrict(uret, cret)) {
+                    // Ambiguous due to omitted params -> keep it a SUGGESTION, not an ERROR
                     out.add(new Difference(
                             IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
-                            className + "#" + name + "(…)",
+                            whereNameOnly,
+                            "UML return type may not match the code overload",
+                            uret, cret,
+                            "Prefer omitting or matching a specific overload"
+                    ));
+                }
+
+                // Visibility (directional) when name-only — detect omission BEFORE normalizing
+                String cVis = VisibilityRules.vis(C.getVisibility());
+                if (omitted(U.getVisibility())) {
+                    out.add(new Difference(
+                            IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
+                            whereNameOnly,
                             "Method visibility omitted in UML",
                             "omitted", cVis,
                             "Optionally show the visibility"
                     ));
+                } else {
+                    String uVis = VisibilityRules.vis(U.getVisibility());
+                    int ur = rank(uVis), cr = rank(cVis);
+                    if (ur > cr) {
+                        out.add(new Difference(
+                                IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
+                                whereNameOnly,
+                                "UML visibility is more restrictive than code",
+                                uVis, cVis,
+                                "Make UML at least as visible as the code"
+                        ));
+                    } else if (ur < cr) {
+                        out.add(new Difference(
+                                IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
+                                whereNameOnly,
+                                "UML visibility is less restrictive than code",
+                                uVis, cVis,
+                                "Consider aligning UML visibility with code"
+                        ));
+                    }
                 }
+
+                // Static (name-only): if omitted and code static => SUGGESTION; if written and differs => ERROR
+                Boolean uStat = U.isStatic();   // may be null if omitted in UML
+                Boolean cStat = C.isStatic();   // expected non-null on code side
+                boolean codeStatic = Boolean.TRUE.equals(cStat);
+                if (uStat == null) {
+                    if (codeStatic) {
+                        out.add(new Difference(
+                                IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
+                                whereNameOnly,
+                                "Static modifier omitted in UML for a static method",
+                                "static: omitted", "static: true",
+                                "Mark the UML method as static"
+                        ));
+                    }
+                } else if (uStat.booleanValue() != codeStatic) {
+                    out.add(new Difference(
+                            IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
+                            whereNameOnly,
+                            "Static modifier mismatch between UML and code",
+                            "static: " + uStat, "static: " + codeStatic,
+                            "Make UML static match the code"
+                    ));
+                }
+
                 continue;
             }
 
+            // Params written: exact signature must exist
             String sigU = SignatureRules.signatureOf(U);
-            C = codeBySig.get(sigU);
+            Method C = codeBySig.get(sigU);
+            String where = className + "#" + sigU;
+
             if (C == null) {
                 out.add(new Difference(
                         IssueKind.METHOD_MISSING_IN_CODE, IssueLevel.ERROR,
@@ -141,6 +182,7 @@ public final class MethodCheckMinimal {
                 continue;
             }
 
+            // Return written must match exactly
             String uret = ns(U.getReturnType());
             String cret = ns(C.getReturnType());
             if (!uret.isEmpty()) {
@@ -165,25 +207,60 @@ public final class MethodCheckMinimal {
                 }
             }
 
-            String uVis = VisibilityRules.vis(U.getVisibility());
+            // Visibility (directional) — detect omission BEFORE normalizing
             String cVis = VisibilityRules.vis(C.getVisibility());
-            if (!uVis.equals("~")) {
-                if (!VisibilityRules.equalStrict(uVis, cVis)) {
-                    out.add(new Difference(
-                            IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
-                            where,
-                            "Method visibility differs",
-                            uVis, cVis,
-                            "Match UML visibility to code (or omit visibility)"
-                    ));
-                }
-            } else {
+            if (omitted(U.getVisibility())) {
                 out.add(new Difference(
                         IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
                         where,
                         "Method visibility omitted in UML",
                         "omitted", cVis,
                         "Optionally show the visibility"
+                ));
+            } else {
+                String uVis = VisibilityRules.vis(U.getVisibility());
+                int ur = rank(uVis), cr = rank(cVis);
+                if (ur > cr) {
+                    out.add(new Difference(
+                            IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
+                            where,
+                            "UML visibility is more restrictive than code",
+                            uVis, cVis,
+                            "Make UML at least as visible as the code"
+                    ));
+                } else if (ur < cr) {
+                    out.add(new Difference(
+                            IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
+                            where,
+                            "UML visibility is less restrictive than code",
+                            uVis, cVis,
+                            "Consider aligning UML visibility with code"
+                    ));
+                }
+            }
+
+            // Static (expects Method.isStatic(): Boolean or boxed Boolean)
+            Boolean uStat = U.isStatic();   // may be null (omitted in UML)
+            Boolean cStat = C.isStatic();   // expected non-null
+            boolean codeStatic = Boolean.TRUE.equals(cStat);
+
+            if (uStat == null) {
+                if (codeStatic) {
+                    out.add(new Difference(
+                            IssueKind.METHOD_MISMATCH, IssueLevel.SUGGESTION,
+                            where,
+                            "Static modifier omitted in UML for a static method",
+                            "static: omitted", "static: true",
+                            "Mark the UML method as static"
+                    ));
+                }
+            } else if (uStat.booleanValue() != codeStatic) {
+                out.add(new Difference(
+                        IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
+                        where,
+                        "Static modifier mismatch between UML and code",
+                        "static: " + uStat, "static: " + codeStatic,
+                        "Make UML static match the code"
                 ));
             }
         }
@@ -240,4 +317,20 @@ public final class MethodCheckMinimal {
 
     private static String ns(String s) { return (s == null || s.isBlank()) ? "" : s.trim(); }
     private static String safe(String s) { return (s == null) ? "" : s.trim(); }
+
+    // treat raw omission before normalizing
+    private static boolean omitted(String v) { return v == null || v.trim().isEmpty(); }
+
+    // smaller is "more public": + (0) < # (1) < ~ (2) < - (3)
+    private static int rank(String v) {
+        if (v == null || v.isBlank()) return 4;
+        String t = v.trim();
+        return switch (t) {
+            case "+" -> 0;   // public
+            case "#" -> 1;   // protected
+            case "~" -> 2;   // package
+            case "-" -> 3;   // private
+            default -> 4;    // unknown/other
+        };
+    }
 }

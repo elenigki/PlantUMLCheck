@@ -1,0 +1,12 @@
+@startuml
+class Manager {
+  - report : Report
+  + Manager(r : Report) : void
+}
+class Report {
+}
+class Logger {
+}
+Manager --> Report
+Manager --> Logger
+@enduml
