@@ -11,6 +11,7 @@ public class ClassInfo {
 	private ArrayList<Attribute> attributes;
 	private ArrayList<Method> methods;
 	private ClassDeclaration declaration;
+	private ArrayList<String> enumConstants;
 	
 	public ClassInfo(String name, ClassType classType, ClassDeclaration declaration) {
 		this.name = name;
@@ -18,6 +19,7 @@ public class ClassInfo {
 		this.attributes = new ArrayList<>();
 		this.methods = new ArrayList<>();
 		this.declaration = declaration;
+		this.enumConstants = new ArrayList<>();
 	}
 	
 	public ClassInfo(String name, ClassType classType, boolean isAbstract, ClassDeclaration declaration) {
@@ -27,6 +29,7 @@ public class ClassInfo {
 		this.attributes = new ArrayList<>();
 		this.methods = new ArrayList<>();
 		this.declaration = declaration;
+		this.enumConstants = new ArrayList<>();
 	}
 	
 	// Add attribute (only allowed for classes)
@@ -92,6 +95,14 @@ public class ClassInfo {
 
 	public void setDeclaration(ClassDeclaration declaration) {
 		this.declaration = declaration;
+	}
+
+	public ArrayList<String> getEnumConstants() {
+		return enumConstants;
+	}
+	
+	public void addEnumConstants(String constant) {
+		enumConstants.add(constant);
 	}
 
 

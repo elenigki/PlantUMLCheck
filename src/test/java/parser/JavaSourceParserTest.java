@@ -592,5 +592,29 @@ public class JavaSourceParserTest {
 		return model.getClasses().stream().filter(c -> c.getName().equals(name)).findFirst()
 				.orElseThrow(() -> new AssertionError("Class not found: " + name));
 	}
+	
+	 @Test
+	    void relationshipsWithEnums_areAssociations() throws Exception {
+	        // Prepare parser
+	        JavaSourceParser parser = new JavaSourceParser();
+
+	        // Use the small EnumAssocCheck.java file (place it under test/resources or similar)
+	        File f = new File("src/test/resources/source_code_samples/EnumAssocCheck.java");
+	        IntermediateModel model = parser.parse(f);
+
+	        // Find relationships in the parsed model
+	        List<Relationship> rels = model.getRelationships();
+
+	        assertFalse(rels.isEmpty(), "Should extract at least one relationship involving enum");
+
+	        for (Relationship r : rels) {
+	            // Either source or target should be the enum
+	            boolean involvesEnum = r.getSourceClass().equals("OrderStatus") || r.getTargetClass().equals("OrderStatus");
+	            if (involvesEnum) {
+	                assertEquals(RelationshipType.ASSOCIATION, r.getType(),
+	                        "Enum-involving relationship must be ASSOCIATION, got: " + r.getType());
+	            }
+	        }
+	    }
 
 }

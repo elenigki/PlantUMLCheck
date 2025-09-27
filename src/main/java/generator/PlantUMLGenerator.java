@@ -52,98 +52,94 @@ public final class PlantUMLGenerator {
 
 	/** Main entry point. */
 	public String generate(IntermediateModel originalModel) {
-	    if (originalModel == null) {
-	        throw new IllegalArgumentException("model is null");
-	    }
-	    System.out.println("Model relationships: ");
-	    for(Relationship r : originalModel.getRelationships()) {
-	    	System.out.println("Source: " + r.getSourceClass() + " , Target: " + r.getTargetClass() + " , Relationship: " + r.getType());
-	    }
+		if (originalModel == null) {
+			throw new IllegalArgumentException("model is null");
+		}
+		System.out.println("Model relationships: ");
+		for (Relationship r : originalModel.getRelationships()) {
+			System.out.println("Source: " + r.getSourceClass() + " , Target: " + r.getTargetClass()
+					+ " , Relationship: " + r.getType());
+		}
 
-	    IntermediateModel model = withNormalizedRelationships(originalModel);
+		IntermediateModel model = withNormalizedRelationships(originalModel);
 
-	    // DEBUG: counts
-	    Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
-	    for (Relationship r : model.getRelationships()) {
-	        counts.merge(r.getType(), 1L, Long::sum);
-	    }
-	    System.out.println("[REL][gen] inputCounts=" + counts);
+		// DEBUG: counts
+		Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
+		for (Relationship r : model.getRelationships()) {
+			counts.merge(r.getType(), 1L, Long::sum);
+		}
+		System.out.println("[REL][gen] inputCounts=" + counts);
 
-	    StringBuilder sb = new StringBuilder(8_192);
-	    sb.append("@startuml").append('\n');
+		StringBuilder sb = new StringBuilder(8_192);
+		sb.append("@startuml").append('\n');
 
-	    // Select classes to include.
-	    List<ClassInfo> all = safeList(modelGetClasses(model));
-	    List<ClassInfo> included = all.stream()
-	            .filter(ci -> !options.onlyOfficialClasses || ci.getDeclaration() == ClassDeclaration.OFFICIAL)
-	            .sorted(Comparator.comparing(PlantUMLGenerator::safeClassName, String.CASE_INSENSITIVE_ORDER))
-	            .collect(Collectors.toList());
+		// Select classes to include.
+		List<ClassInfo> all = safeList(modelGetClasses(model));
+		List<ClassInfo> included = all.stream()
+				.filter(ci -> !options.onlyOfficialClasses || ci.getDeclaration() == ClassDeclaration.OFFICIAL)
+				.sorted(Comparator.comparing(PlantUMLGenerator::safeClassName, String.CASE_INSENSITIVE_ORDER))
+				.collect(Collectors.toList());
 
-	    // Emit class/interface/enum blocks
-	    for (ClassInfo ci : included) {
-	        emitTypeBlock(sb, ci);
-	    }
+		// Emit class/interface/enum blocks
+		for (ClassInfo ci : included) {
+			emitTypeBlock(sb, ci);
+		}
 
-	    // Emit relationships
-	    List<Relationship> rels = safeList(modelGetRelationships(model));
-	    if (!rels.isEmpty()) {
-	        // Create a set of included names for pruning
-	        Set<String> includedNames = included.stream()
-	                .map(PlantUMLGenerator::safeClassName)
-	                .collect(Collectors.toCollection(LinkedHashSet::new));
+		// Emit relationships
+		List<Relationship> rels = safeList(modelGetRelationships(model));
+		if (!rels.isEmpty()) {
+			// Create a set of included names for pruning
+			Set<String> includedNames = included.stream().map(PlantUMLGenerator::safeClassName)
+					.collect(Collectors.toCollection(LinkedHashSet::new));
 
-	        // Sort deterministically
-	        rels.sort(Comparator.comparing((Relationship r) -> safeClassName(safeSource(r)))
-	                .thenComparing(r -> safeClassName(safeTarget(r)))
-	                .thenComparing(r -> r.getType().name()));
+			// Sort deterministically
+			rels.sort(Comparator.comparing((Relationship r) -> safeClassName(safeSource(r)))
+					.thenComparing(r -> safeClassName(safeTarget(r))).thenComparing(r -> r.getType().name()));
 
-	        for (Relationship r : rels) {
-	            ClassInfo src = safeSource(r);
-	            ClassInfo dst = safeTarget(r);
-	            if (src == null || dst == null) continue;
+			for (Relationship r : rels) {
+				ClassInfo src = safeSource(r);
+				ClassInfo dst = safeTarget(r);
+				if (src == null || dst == null)
+					continue;
 
-	            String srcName = safeClassName(src);
-	            String dstName = safeClassName(dst);
+				String srcName = safeClassName(src);
+				String dstName = safeClassName(dst);
 
-	            if (options.pruneDanglingRelationships) {
-	                if (!includedNames.contains(srcName) || !includedNames.contains(dstName)) {
-	                    continue; // skip relationships to filtered classes (e.g., DUMMY)
-	                }
-	            }
+				if (options.pruneDanglingRelationships) {
+					if (!includedNames.contains(srcName) || !includedNames.contains(dstName)) {
+						continue; // skip relationships to filtered classes (e.g., DUMMY)
+					}
+				}
 
-	            RelationshipType rt = r.getType();
-	            String arrow;
+				RelationshipType rt = r.getType();
+				String arrow;
 
-	            if (isInheritance(rt)) {
-	                // Left-pointing for inheritance; parent (target) first.
-	                arrow = (rt == RelationshipType.GENERALIZATION) ? "<|--" : "<|..";
+				if (isInheritance(rt)) {
+					// Left-pointing for inheritance; parent (target) first.
+					arrow = (rt == RelationshipType.GENERALIZATION) ? "<|--" : "<|..";
 
-	                // DEBUG
-	                System.out.println("[REL][emit] " + dstName + " " + arrow + " " + srcName + " (" + rt + ")");
+					// DEBUG
+					System.out.println("[REL][emit] " + dstName + " " + arrow + " " + srcName + " (" + rt + ")");
 
-	                sb.append(quoteIfNeeded(dstName)).append(' ')
-	                  .append(arrow).append(' ')
-	                  .append(quoteIfNeeded(srcName))
-	                  .append('\n');
-	            } else {
-	                arrow = toArrow(rt);
-	                if (arrow == null) continue;
+					sb.append(quoteIfNeeded(dstName)).append(' ').append(arrow).append(' ')
+							.append(quoteIfNeeded(srcName)).append('\n');
+				} else {
+					arrow = toArrow(rt);
+					if (arrow == null)
+						continue;
 
-	                // DEBUG
-	                System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + rt + ")");
+					// DEBUG
+					System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + rt + ")");
 
-	                sb.append(quoteIfNeeded(srcName)).append(' ')
-	                  .append(arrow).append(' ')
-	                  .append(quoteIfNeeded(dstName))
-	                  .append('\n');
-	            }
-	        } // ← closes for (Relationship r : rels)
-	    }     // ← closes if (!rels.isEmpty())
+					sb.append(quoteIfNeeded(srcName)).append(' ').append(arrow).append(' ')
+							.append(quoteIfNeeded(dstName)).append('\n');
+				}
+			} // ← closes for (Relationship r : rels)
+		} // ← closes if (!rels.isEmpty())
 
-	    sb.append("@enduml").append('\n');
-	    return sb.toString();
+		sb.append("@enduml").append('\n');
+		return sb.toString();
 	}
-
 
 	// --- Preprocessing methods ---
 
@@ -309,79 +305,110 @@ public final class PlantUMLGenerator {
 	}
 
 	// --- Helpers for class blocks ---
-	
+
 	private void emitTypeBlock(StringBuilder sb, ClassInfo ci) {
-	    String name = safeClassName(ci);
+		String name = safeClassName(ci);
 
-	    ClassType kind = ci.getClassType();
-	    boolean isAbstract = safeIsAbstract(ci);
+		ClassType kind = ci.getClassType();
+		boolean isAbstract = safeIsAbstract(ci);
 
-	    String headerKeyword;
-	    switch (kind) {
-	        case INTERFACE: headerKeyword = "interface"; break;
-	        case ENUM:      headerKeyword = "enum";      break;
-	        case CLASS:
-	        default:        headerKeyword = isAbstract ? "abstract class" : "class"; break;
-	    }
+		String headerKeyword;
+		switch (kind) {
+		case INTERFACE:
+			headerKeyword = "interface";
+			break;
+		case ENUM:
+			headerKeyword = "enum";
+			break;
+		case CLASS:
+		default:
+			headerKeyword = isAbstract ? "abstract class" : "class";
+			break;
+		}
 
-	    sb.append(headerKeyword).append(' ').append(quoteIfNeeded(name)).append(" {").append('\n');
+		sb.append(headerKeyword).append(' ').append(quoteIfNeeded(name)).append(" {").append('\n');
 
-	    // Attributes
-	    for (Attribute a : safeList(ci.getAttributes())) {
-	        if (shouldSkipVisibility(a.getVisibility())) continue;
+		// --- ENUM CONSTANTS (names only, no visibility) ---
+		if (kind == ClassType.ENUM) {
+			List<String> constants = Collections.emptyList();
+			try {
+				// assumes a getter exists; if not, this block safely skips
+				List<String> c = ci.getEnumConstants();
+				if (c != null)
+					constants = c;
+			} catch (Throwable ignore) {
+				// no enum constants available; keep empty
+			}
 
-	        String vis = normalizeVisibility(a.getVisibility());
-	        String type = safeType(a.getType());
-	        String attrName = safe(a.getName());
+			if (!constants.isEmpty()) {
+				for (String constant : constants) {
+					if (constant != null && !constant.isBlank()) {
+						sb.append("  ").append(constant.trim()).append('\n');
+					}
+				}
+				// optional spacing before attributes/methods if any
+				if (!safeList(ci.getAttributes()).isEmpty() || !safeList(ci.getMethods()).isEmpty()) {
+					sb.append('\n');
+				}
+			}
+		}
 
-	        // Build the payload without visibility
-	        StringBuilder payload = new StringBuilder();
-	        payload.append(attrName);
-	        if (!type.isEmpty()) {
-	            payload.append(" : ").append(type);
-	        }
+		// --- ATTRIBUTES ---
+		for (Attribute a : safeList(ci.getAttributes())) {
+			if (shouldSkipVisibility(a.getVisibility()))
+				continue;
 
-	        // Emit: visibility first, then underline payload if static
-	        sb.append("  ").append(vis).append(' ');
-	        if (a.isStatic()) {
-	            sb.append("__").append(payload).append("__");
-	        } else {
-	            sb.append(payload);
-	        }
-	        sb.append('\n');
-	    }
+			String vis = normalizeVisibility(a.getVisibility());
+			String type = safeType(a.getType());
+			String attrName = safe(a.getName());
 
-	    // Methods
-	    for (Method m : safeList(ci.getMethods())) {
-	        if (shouldSkipVisibility(m.getVisibility())) continue;
+			// Build the payload without visibility
+			StringBuilder payload = new StringBuilder();
+			payload.append(attrName);
+			if (!type.isEmpty()) {
+				payload.append(" : ").append(type);
+			}
 
-	        String vis = normalizeVisibility(m.getVisibility());
-	        String methodName = safe(m.getName());
-	        String returnType = safeType(m.getReturnType());
-	        List<String> params = safeList(m.getParameters());
-	        String joinedParams = params.stream().map(PlantUMLGenerator::safeType).collect(Collectors.joining(", "));
+			// Emit: visibility first, then underline payload if static
+			sb.append("  ").append(vis).append(' ');
+			if (a.isStatic()) {
+				sb.append("__").append(payload).append("__");
+			} else {
+				sb.append(payload);
+			}
+			sb.append('\n');
+		}
 
-	        // Build the payload without visibility
-	        StringBuilder payload = new StringBuilder();
-	        payload.append(methodName).append('(').append(joinedParams).append(')');
-	        if (!returnType.isEmpty()) {
-	            payload.append(" : ").append(returnType);
-	        }
+		// --- METHODS ---
+		for (Method m : safeList(ci.getMethods())) {
+			if (shouldSkipVisibility(m.getVisibility()))
+				continue;
 
-	        // Emit: visibility first, then underline payload if static
-	        sb.append("  ").append(vis).append(' ');
-	        if (m.isStatic()) {
-	            sb.append("__").append(payload).append("__");
-	        } else {
-	            sb.append(payload);
-	        }
-	        sb.append('\n');
-	    }
+			String vis = normalizeVisibility(m.getVisibility());
+			String methodName = safe(m.getName());
+			String returnType = safeType(m.getReturnType());
+			List<String> params = safeList(m.getParameters());
+			String joinedParams = params.stream().map(PlantUMLGenerator::safeType).collect(Collectors.joining(", "));
 
-	    sb.append("}").append('\n');
+			// Build the payload without visibility
+			StringBuilder payload = new StringBuilder();
+			payload.append(methodName).append('(').append(joinedParams).append(')');
+			if (!returnType.isEmpty()) {
+				payload.append(" : ").append(returnType);
+			}
+
+			// Emit: visibility first, then underline payload if static
+			sb.append("  ").append(vis).append(' ');
+			if (m.isStatic()) {
+				sb.append("__").append(payload).append("__");
+			} else {
+				sb.append(payload);
+			}
+			sb.append('\n');
+		}
+
+		sb.append("}").append('\n');
 	}
-
-
 
 	// --- Relationship arrow mapping ---
 	private static String toArrow(RelationshipType type) {
@@ -513,9 +540,9 @@ public final class PlantUMLGenerator {
 		}
 		return n;
 	}
-	
+
 	private static boolean isInheritance(RelationshipType t) {
-	    return t == RelationshipType.GENERALIZATION || t == RelationshipType.REALIZATION;
+		return t == RelationshipType.GENERALIZATION || t == RelationshipType.REALIZATION;
 	}
 
 }
