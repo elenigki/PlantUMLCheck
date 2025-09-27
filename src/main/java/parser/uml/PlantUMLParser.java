@@ -5,17 +5,17 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
-/** Parses PlantUML class diagrams into an IntermediateModel. */
+
 public class PlantUMLParser {
 
-    /** Entry point: read, preprocess multi-line parts, then parse. */
+    // Entry point: read, preprocess multi-line parts, then parse.
     public IntermediateModel parse(File file) throws IOException {
         List<String> raw = readLines(file);
         List<String> logical = preprocessLines(raw);
         return parseLines(logical);
     }
 
-    /** Reads non-empty trimmed lines. */
+    // Reads non-empty trimmed lines.
     private List<String> readLines(File file) throws IOException {
         List<String> lines = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
@@ -28,7 +28,7 @@ public class PlantUMLParser {
         return lines;
     }
 
-    /** Joins multi-line headers (params/generics) into single logical lines. */
+    // Joins multi-line headers (params/generics) into single logical lines.
     private List<String> preprocessLines(List<String> lines) {
         List<String> out = new ArrayList<>();
         StringBuilder buf = new StringBuilder();
@@ -66,7 +66,7 @@ public class PlantUMLParser {
         return out;
     }
 
-    /** Parses logical lines into classes, members, and relationships. */
+    // Parses logical lines into classes, members, and relationships.
     private IntermediateModel parseLines(List<String> lines) {
         IntermediateModel model = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
         ClassInfo current = null;
@@ -104,7 +104,7 @@ public class PlantUMLParser {
         return model;
     }
 
-    /** Parses "class X" with optional "abstract" and optional "<<external>>". */
+    // Parses "class X" with optional "abstract" and optional "<<external>>".
     private ClassInfo parseClassDeclaration(String line, IntermediateModel model) {
         Matcher m = Pattern.compile("(abstract\\s+)?class\\s+(\\w+)\\s*(?:<<\\s*([\\w-]+)\\s*>>)?").matcher(line);
         if (!m.find()) return null;
@@ -137,7 +137,7 @@ public class PlantUMLParser {
         return ci;
     }
 
-    /** Parses "interface X". */
+    // Parses "interface X".
     private ClassInfo parseInterfaceDeclaration(String line, IntermediateModel model) {
         Matcher m = Pattern.compile("interface\\s+(\\w+)").matcher(line);
         if (!m.find()) return null;
@@ -158,7 +158,7 @@ public class PlantUMLParser {
         return ci;
     }
 
-    /** Parses "enum X". */
+    // Parses "enum X".
     private ClassInfo parseEnumDeclaration(String line, IntermediateModel model) {
         Matcher m = Pattern.compile("enum\\s+(\\w+)").matcher(line);
         if (!m.find()) return null;
@@ -179,7 +179,7 @@ public class PlantUMLParser {
         return ci;
     }
 
-    /** Parses "X extends Y". */
+    // Parses "X extends Y".
     private boolean parseInheritance(String line, IntermediateModel model) {
         Matcher m = Pattern.compile("(?:class\\s+)?(\\w+)\\s+extends\\s+(\\w+)").matcher(line);
         if (!m.find()) return false;
@@ -190,7 +190,7 @@ public class PlantUMLParser {
         return true;
     }
 
-    /** Parses "X implements I". */
+    // Parses "X implements I".
     private boolean parseRealization(String line, IntermediateModel model) {
         Matcher m = Pattern.compile("(?:class\\s+)?(\\w+)\\s+implements\\s+(\\w+)").matcher(line);
         if (!m.find()) return false;
@@ -201,7 +201,7 @@ public class PlantUMLParser {
         return true;
     }
 
-    /** Parses explicit arrows like ->, -->, <-, <--, --|>, *--, o--, ..>, etc. */
+    // Parses explicit arrows like ->, -->, <-, <--, --|>, *--, o--, ..>, etc.
     private void parseExplicitRelationships(List<String> lines, IntermediateModel model) {
         Pattern right = Pattern.compile("(\\w+)\\s+([*o]?[-.]+\\|?>?|[-.]+\\|?>?[*o]?)\\s+(\\w+)(\\s*:\\s*\\w+)?");
         Pattern left  = Pattern.compile("(\\w+)\\s+((<\\|?[-.]+)|([-.]+\\|?>?|[-.]+[*o]))\\s+(\\w+)(\\s*:\\s*\\w+)?");
@@ -261,7 +261,7 @@ public class PlantUMLParser {
         }
     }
 
-    /** Parses attributes (supports visibility outside __ and whole-line __). */
+    // Parses attributes (supports visibility outside __ and whole-line __).
     private boolean parseAttribute(String line, ClassInfo currentClass) {
         String s = line.trim();
         boolean isStatic = false;
@@ -302,7 +302,7 @@ public class PlantUMLParser {
         return false;
     }
 
-    /** Parses methods (supports visibility outside __, whole-line __, and params as types). */
+    // Parses methods (supports visibility outside __, whole-line __, and params as types).
     private boolean parseMethod(String line, ClassInfo currentClass) {
         String s = line.trim();
         boolean isStatic = false;
@@ -373,12 +373,12 @@ public class PlantUMLParser {
 
     // -------------------- helpers (grouped) --------------------
 
-    /** True if line looks like an explicit relationship arrow. */
+    // True if line looks like an explicit relationship arrow.
     private boolean isExplicitRelationshipLine(String line) {
         return line.matches("\\w+\\s+([*o]?[-.]+\\|?>?|<\\|?[-.]+|[-.]+[*o])\\s+\\w+(\\s*:\\s*\\w+)?");
     }
 
-    /** Returns an existing class or creates a DUMMY one of given default type. */
+    // Returns an existing class or creates a DUMMY one of given default type.
     private ClassInfo resolveOrCreateClass(IntermediateModel model, String name, ClassType fallback) {
         ClassInfo ci = model.findClassByName(name);
         if (ci != null) return ci;
@@ -388,14 +388,14 @@ public class PlantUMLParser {
         return ci;
     }
 
-    /** Counts a specific character. */
+    // Counts a specific character. */
     private int countChar(String s, char c) {
         int n = 0;
         for (int i = 0; i < s.length(); i++) if (s.charAt(i) == c) n++;
         return n;
     }
 
-    /** Returns only the parameter type from "name : Type" | "Type name" | "Type". */
+    // Returns only the parameter type from "name : Type" | "Type name" | "Type".
     private String extractParamType(String raw) {
         if (raw == null) return "";
         String s = raw.trim();
