@@ -682,6 +682,30 @@ public class PlatnUMLParserTest {
 	    // m3: complex types preserved
 	    assertEquals(List.of("int", "List<String>"), m3.getParameters());
 	}
+	
+	@Test
+	public void testClassStereotypeExternalCreatesDummy() throws Exception {
+	    String uml = "@startuml\n" +
+	                 "class Customer <<external>>\n" + // must be DUMMY
+	                 "class Order\n" +                  // OFFICIAL
+	                 "@enduml";
+
+	    File f = tempPUML(uml);
+	    IntermediateModel model = new PlantUMLParser().parse(f);
+
+	    ClassInfo customer = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Customer"))
+	        .findFirst().orElseThrow();
+	    assertEquals(ClassType.CLASS, customer.getClassType());
+	    assertEquals(ClassDeclaration.DUMMY, customer.getDeclaration(), "Customer should be DUMMY due to <<external>>");
+
+	    ClassInfo order = model.getClasses().stream()
+	        .filter(c -> c.getName().equals("Order"))
+	        .findFirst().orElseThrow();
+	    assertEquals(ClassType.CLASS, order.getClassType());
+	    assertEquals(ClassDeclaration.OFFICIAL, order.getDeclaration(), "Order should be OFFICIAL");
+	}
+
 
 
 

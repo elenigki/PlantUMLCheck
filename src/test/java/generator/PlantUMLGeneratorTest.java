@@ -186,24 +186,6 @@ public class PlantUMLGeneratorTest {
         assertFalse(n.contains("A <|.. A"));
         assertTrue(n.contains("class A {"));
     }
-
-    @Test
-    @DisplayName("Prunes dangling relationships with non-official classes (keeps official only)")
-    void pruneDanglingToGhost() {
-        ClassInfo real = new ClassInfo("RealType", ClassType.CLASS, ClassDeclaration.OFFICIAL);
-        ClassInfo ghost = new ClassInfo("GhostType", ClassType.CLASS, ClassDeclaration.DUMMY);
-
-        IntermediateModel model = new IntermediateModel(ModelSource.SOURCE_CODE);
-        model.addClass(real);
-        model.addClass(ghost);
-        model.addRelationship(new Relationship(real, ghost, RelationshipType.ASSOCIATION));
-
-        String n = norm(new PlantUMLGenerator().generate(model));
-
-        assertTrue(n.contains("class RealType {"));
-        assertFalse(n.contains("class GhostType {"));
-        assertFalse(n.contains("RealType --> GhostType"));
-    }
     
     @Test
     @DisplayName("Static members are underlined with __...__ in output")

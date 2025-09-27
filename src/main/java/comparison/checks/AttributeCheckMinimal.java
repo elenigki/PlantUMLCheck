@@ -23,7 +23,7 @@ public final class AttributeCheckMinimal {
 
     private AttributeCheckMinimal() {}
 
-    /** Compare attributes for one class under MINIMAL rules. */
+    /* Compare attributes for one class under MINIMAL rules. */
     public static List<Difference> compareAttributesInClass(String className,
                                                             ClassInfo codeC,
                                                             ClassInfo umlC,
@@ -150,7 +150,7 @@ public final class AttributeCheckMinimal {
 
     // --- helpers ---
 
-    static Map<String, Attribute> byName(List<Attribute> list) {
+    private static Map<String, Attribute> byName(List<Attribute> list) {
         Map<String, Attribute> m = new LinkedHashMap<>();
         if (list == null) return m;
         for (Attribute a : list) {

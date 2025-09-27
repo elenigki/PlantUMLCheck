@@ -144,31 +144,50 @@ public class PlantUMLParser {
 		return model;
 	}
 
-	// Handles class declarations with or without the "abstract" modifier.
+	// Handles class declarations with optional "abstract" and optional stereotype, e.g.:
+	// "class A", "abstract class B", "class Customer <<external>>"
 	private ClassInfo parseClassDeclaration(String line, IntermediateModel model) {
-		// Matches: "class Car", "abstract class Shape"
-		Matcher matcher = Pattern.compile("(abstract\\s+)?class\\s+(\\w+)").matcher(line);
-		if (matcher.find()) {
-			boolean isAbstract = matcher.group(1) != null;
-			String name = matcher.group(2);
+	    // (1) abstract?  (2) class keyword  (3) name  (4) optional stereotype like <<external>>
+	    Matcher matcher = Pattern.compile(
+	        "(abstract\\s+)?class\\s+(\\w+)\\s*(?:<<\\s*([\\w-]+)\\s*>>)?"
+	    ).matcher(line);
 
-			ClassInfo existing = model.findClassByName(name);
-			if (existing != null) {
-				existing.setClassType(ClassType.CLASS);
-				existing.setAbstract(isAbstract);
-				if(existing.getDeclaration() == ClassDeclaration.DUMMY) {
-					existing.setDeclaration( ClassDeclaration.OFFICIAL);
-					model.removeWarningsForClass(name);
-				}
-				return existing;
-			}
+	    if (!matcher.find()) return null;
 
-			ClassInfo ci = new ClassInfo(name, ClassType.CLASS, isAbstract, ClassDeclaration.OFFICIAL);
-			model.addClass(ci);
-			return ci;
-		}
-		return null;
+	    boolean isAbstract = matcher.group(1) != null;
+	    String name = matcher.group(2);
+	    String stereotype = matcher.group(3); // may be null
+
+	    boolean markAsDummy = (stereotype != null) && "external".equalsIgnoreCase(stereotype);
+
+	    ClassInfo existing = model.findClassByName(name);
+	    if (existing != null) {
+	        existing.setClassType(ClassType.CLASS);
+	        existing.setAbstract(isAbstract);
+	        if (markAsDummy) {
+	            // Explicit external → keep/mark as DUMMY, do NOT add a warning
+	            existing.setDeclaration(ClassDeclaration.DUMMY);
+	        } else {
+	            // Normal declaration → upgrade DUMMY → OFFICIAL and clear warnings
+	            if (existing.getDeclaration() == ClassDeclaration.DUMMY) {
+	                existing.setDeclaration(ClassDeclaration.OFFICIAL);
+	                model.removeWarningsForClass(name);
+	            } else {
+	                existing.setDeclaration(ClassDeclaration.OFFICIAL);
+	            }
+	        }
+	        return existing;
+	    }
+
+	    ClassDeclaration decl = markAsDummy ? ClassDeclaration.DUMMY : ClassDeclaration.OFFICIAL;
+	    ClassInfo ci = new ClassInfo(name, ClassType.CLASS, isAbstract, decl);
+	    model.addClass(ci);
+
+	    // Note: when marked DUMMY due to <<external>>, we do NOT add a dummy warning;
+	    // it is intentional and explicit in the UML.
+	    return ci;
 	}
+
 
 	// Handles interface declarations like "interface Drawable"
 	private ClassInfo parseInterfaceDeclaration(String line, IntermediateModel model) {
