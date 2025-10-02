@@ -5,7 +5,6 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
-
 public class PlantUMLParser {
 	private final IntermediateModel model;
 
