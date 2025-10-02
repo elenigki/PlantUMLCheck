@@ -7,7 +7,12 @@ import java.util.regex.*;
 
 
 public class PlantUMLParser {
+	private final IntermediateModel model;
 
+	
+	public PlantUMLParser(){
+		this.model = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
+	}
     // Entry point: read, preprocess multi-line parts, then parse.
     public IntermediateModel parse(File file) throws IOException {
         List<String> raw = readLines(file);
@@ -68,7 +73,6 @@ public class PlantUMLParser {
 
     // Parses logical lines into classes, members, and relationships.
     private IntermediateModel parseLines(List<String> lines) {
-        IntermediateModel model = new IntermediateModel(ModelSource.PLANTUML_SCRIPT);
         ClassInfo current = null;
 
         for (String line : lines) {

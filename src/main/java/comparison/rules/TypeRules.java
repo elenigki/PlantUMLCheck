@@ -1,15 +1,15 @@
 package comparison.rules;
 
-/** Decides if two types are equal/compatible. */
+// Decides if two types are equal/compatible.
 public final class TypeRules {
     private TypeRules() {}
 
-    /** Strict type equality (trim + collapse spaces). */
+    // Strict type equality (trim + collapse spaces).
     public static boolean equalStrict(String a, String b) {
         return norm(a).equals(norm(b));
     }
 
-    /** Relaxed compatibility (wrapper/fqcn/simple, generic erasure, varargs≈array, arrays). */
+    // Relaxed compatibility (wrapper/fqcn/simple, generic erasure, varargs≈array, arrays).
     public static boolean equalRelaxed(String a, String b) {
         String A = norm(a), B = norm(b);
 
@@ -40,36 +40,36 @@ public final class TypeRules {
 
     // --- helpers ---
 
-    /** Normalizes whitespace. */
+    // Normalizes whitespace.
     public static String norm(String t) {
         if (t == null) return "";
         return t.trim().replaceAll("\\s+", "");
     }
 
-    /** Converts varargs to arrays (e.g., int... -> int[]). */
+    // Converts varargs to arrays (e.g., int... -> int[]).
     private static String toArrayForm(String t) {
         return t.replace("...", "[]");
     }
 
-    /** Removes simple generic parts (good enough for matching). */
+    // Removes simple generic parts (good enough for matching).
     public static String eraseGenerics(String t) {
         return t.replaceAll("<[^>]*>", "");
     }
 
-    /** Returns the simple (unqualified) name. */
+    // Returns the simple (unqualified) name.
     public static String simple(String t) {
         int i = t.lastIndexOf('.');
         return (i < 0) ? t : t.substring(i + 1);
     }
 
-    /** Compares base types using relaxed rules. */
+    //Compares base types using relaxed rules.
     private static boolean baseTypesRelaxedEqual(String a, String b) {
         String A = simple(a), B = simple(b);
         if (primitiveWrapperPair(A, B)) return true;
         return A.equals(B);
     }
 
-    /** Checks primitive/wrapper pairs by simple name. */
+    // Checks primitive/wrapper pairs by simple name.
     private static boolean primitiveWrapperPair(String a, String b) {
         return pair(a,b,"int","Integer") ||
                pair(a,b,"long","Long") ||
@@ -85,7 +85,7 @@ public final class TypeRules {
         return (a.equals(p) && b.equals(w)) || (b.equals(p) && a.equals(w));
     }
 
-    /** Splits an array type into base + dimensions. */
+    // Splits an array type into base + dimensions.
     private static ArrayInfo splitArray(String t) {
         int dims = 0;
         while (t.endsWith("[]")) {
@@ -95,7 +95,7 @@ public final class TypeRules {
         return new ArrayInfo(t, dims);
     }
 
-    /** Small holder for array info. */
+    // Small holder for array info.
     private static final class ArrayInfo {
         final String base;
         final int dims;

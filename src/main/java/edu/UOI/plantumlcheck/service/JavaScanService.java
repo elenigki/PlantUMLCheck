@@ -17,17 +17,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Saves uploads to a temp workspace and produces a package->classes map for the UI.
- * Strategy:
- *  1) Try user's JavaProjectScanner with common method names.
- *  2) If it fails, do a lightweight text scan to extract package and class names.
- * In all cases we return a Map<String, List<String>> ready for rendering.
- */
+
 @Service
 public class JavaScanService {
 
-    /** Tiny holder for saved workspace. */
+    //Tiny holder for saved workspace.
     public static final class Workspace {
         private final Path root;
         private final List<Path> savedFiles;
@@ -36,7 +30,7 @@ public class JavaScanService {
         public List<Path> savedFiles() { return savedFiles; }
     }
 
-    /** Save source files into a unique temp workspace. */
+    // Save source files into a unique temp workspace.
     public Workspace saveSourceToWorkspace(MultipartFile[] sourceFiles) throws IOException {
         if (sourceFiles == null || sourceFiles.length == 0) throw new IllegalArgumentException("No source files to save");
 
@@ -61,7 +55,7 @@ public class JavaScanService {
         return new Workspace(root, saved);
     }
 
-    /** Public entry: produce a package->classes map; never returns null. */
+    // Public entry: produce a package->classes map; never returns null.
     public Map<String, List<String>> buildPackageMap(Path workspaceRoot) {
         Objects.requireNonNull(workspaceRoot, "workspaceRoot");
         try {
@@ -131,7 +125,7 @@ public class JavaScanService {
         return List.of();
     }
 
-    /** Convert ScannedJavaInfo list to package->classes map. */
+    // Convert ScannedJavaInfo list to package->classes map.
     private Map<String, List<String>> toPackageMap(List<ScannedJavaInfo> infos) {
         Map<String, List<String>> map = new TreeMap<>();
         for (ScannedJavaInfo s : infos) {

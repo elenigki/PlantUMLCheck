@@ -12,13 +12,9 @@ import model.Method;
 
 import java.util.*;
 
-/** Method presence and contracts inside one class. */
 public final class MethodCheck {
 
-	/**
-	 * Compares methods for one class. (Used for STRICT and RELAXED; MINIMAL uses
-	 * MethodCheckMinimal)
-	 */
+	//Compares methods for one class. (Used for STRICT and RELAXED; MINIMAL uses MethodCheckMinimal)
 	public static List<Difference> compareMethodsInClass(String className, ClassInfo codeC, ClassInfo umlC,
 			CheckMode mode) {
 		List<Difference> out = new ArrayList<>();
@@ -105,7 +101,7 @@ public final class MethodCheck {
 		return out;
 	}
 
-	/** Builds signature -> Method for quick lookups in a class. */
+	// Builds signature -> Method for quick lookups in a class.
 	static Map<String, Method> bySignature(List<Method> list) {
 		Map<String, Method> m = new LinkedHashMap<>();
 		if (list == null)
@@ -118,12 +114,12 @@ public final class MethodCheck {
 		return m;
 	}
 
-	/** Makes a method signature like foo(int,String). */
+	// Makes a method signature like foo(int,String).
 	static String signatureOf(Method m) {
 		return SignatureRules.signatureOf(m);
 	}
 
-	/** True if UML has same name and arity (used to suppress symmetric missing). */
+	// True if UML has same name and arity (used to suppress symmetric missing).
 	static boolean umlHasSameNameArity(List<Method> umlMethods, Method codeMethod) {
 		if (umlMethods == null || codeMethod == null)
 			return false;

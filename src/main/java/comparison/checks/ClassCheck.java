@@ -9,10 +9,9 @@ import model.IntermediateModel;
 
 import java.util.*;
 
-/** Class presence and basic properties. */
 public final class ClassCheck {
 
-    /** Finds class presence differences between code and UML. */
+    // Finds class presence differences between code and UML.
     public static List<Difference> compareClasses(IntermediateModel code, IntermediateModel uml, CheckMode mode) {
         List<Difference> out = new ArrayList<>();
         Map<String, ClassInfo> codeBy = byName(code.getClasses());
@@ -47,7 +46,7 @@ public final class ClassCheck {
         return out;
     }
 
-    /** Returns class names present in both models. */
+    // Returns class names present in both models.
     public static Set<String> commonClassNames(IntermediateModel code, IntermediateModel uml) {
         Map<String, ClassInfo> codeBy = byName(code.getClasses());
         Map<String, ClassInfo> umlBy  = byName(uml.getClasses());
@@ -56,7 +55,7 @@ public final class ClassCheck {
         return s;
     }
 
-    /** Returns the class with this name from the given model. */
+    // Returns the class with this name from the given model.
     public static ClassInfo classFrom(IntermediateModel m, String name) {
         if (m == null || m.getClasses() == null) return null;
         for (ClassInfo c : m.getClasses()) {

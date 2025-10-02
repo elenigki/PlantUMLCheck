@@ -7,7 +7,6 @@ import comparison.issues.IssueLevel;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/** Turns differences into simple text or markdown with "Expected X; UML has Y" phrasing. */
 public final class ReportPrinter {
     private ReportPrinter() {}
 

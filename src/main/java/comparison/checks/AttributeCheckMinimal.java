@@ -11,19 +11,12 @@ import model.ClassInfo;
 
 import java.util.*;
 
-/**
- * MINIMAL member rules (formerly RELAXED_PLUS):
- * - Code is the ground truth.
- * - If UML WRITES a detail and it differs => ERROR.
- * - If UML OMITS a detail => SUGGESTION (or INFO for non-API).
- * - Name must match exactly when present (no fuzzy).
- * - Static: if UML writes it, it must match; if omitted and code is static => SUGGESTION.
- */
+
 public final class AttributeCheckMinimal {
 
     private AttributeCheckMinimal() {}
 
-    /* Compare attributes for one class under MINIMAL rules. */
+    // Compare attributes for one class under MINIMAL rules.
     public static List<Difference> compareAttributesInClass(String className,
                                                             ClassInfo codeC,
                                                             ClassInfo umlC,

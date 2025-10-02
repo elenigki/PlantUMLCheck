@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Compares code vs UML and collects differences. */
+// Compares code vs UML and collects differences.
 public class ModelComparator {
 
     private final CheckMode mode;  // STRICT, RELAXED, MINIMAL

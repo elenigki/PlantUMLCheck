@@ -3,7 +3,7 @@ package comparison.rules;
 import model.Method;
 import java.util.List;
 
-/** Builds method signatures like foo(int,String). */
+// Builds method signatures like foo(int,String).
 public final class SignatureRules {
   private SignatureRules() {}
   public static String signatureOf(Method m) {

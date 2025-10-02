@@ -12,14 +12,6 @@ import model.Method;
 
 import java.util.*;
 
-/**
- * MINIMAL member rules (formerly RELAXED_PLUS):
- * - If UML WRITES return/params and they differ -> ERROR.
- * - If UML OMITS return/params -> SUGGESTION (abstraction is allowed).
- * - Name must match exactly when present.
- * - Code-only methods: SUGGESTION for public/protected, INFO otherwise.
- * - Static: if UML writes it, it must match; if omitted and code is static => SUGGESTION.
- */
 public final class MethodCheckMinimal {
 
     private MethodCheckMinimal() {}

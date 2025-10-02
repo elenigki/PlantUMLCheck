@@ -23,13 +23,13 @@ import java.util.*;
 @Service
 public class CompareServiceImpl implements CompareService {
 
-    /** Keep the official code-side model from the latest run for reuse (e.g., UML generation). */
+    // Cache last parsed code model so we can export UML later if needed
     private IntermediateModel lastCodeModel;
 
     @Override
     public RunResult run(Selection sel) {
         try {
-            // Parse Java (selected classes) → official code model
+            // Parse Java files to code-side model
             IntermediateModel codeModel = parseSelectedJava(sel.workspaceRoot(), sel.selectedFqcns());
             this.lastCodeModel = codeModel; // <-- expose via getter
             List<String> notices = new ArrayList<>(codeModel.getWarnings());
@@ -37,21 +37,23 @@ public class CompareServiceImpl implements CompareService {
             IntermediateModel umlModel = null;
             List<Difference> diffs = List.of();
 
-            // Map UI mode -> comparator mode
+            // Map UI mode (STRICT/RELAXED/MINIMAL) to comparator CheckMode
             CheckMode checkMode = switch (sel.mode()) {
                 case STRICT  -> CheckMode.STRICT;
                 case RELAXED -> CheckMode.RELAXED;
                 case MINIMAL -> CheckMode.MINIMAL;
             };
 
+			// Parse PlantUML files if not in code-only mode
             if (!sel.codeOnly()) {
                 umlModel = parsePlantUmlFiles(sel.plantumlFiles());
                 notices.addAll(umlModel.getWarnings());
+				// Compare models
                 ModelComparator cmp = new ModelComparator(checkMode);
                 diffs = cmp.compare(codeModel, umlModel);
             }
 
-            // --- Roll-up / Summary ---
+            // Build summary of results
             int codeCount = sizeSafe(codeModel.getClasses());
             int umlCount  = (umlModel == null) ? 0 : sizeSafe(umlModel.getClasses());
             int analyzed  = codeCount;
@@ -77,6 +79,7 @@ public class CompareServiceImpl implements CompareService {
             int diffCount = diffs.size();
             Summary sum = new Summary(codeCount, umlCount, analyzed, matchCount, diffCount);
 
+			// Create readable report in natural languange
             String reportText = ReportPrinter.toText(diffs, checkMode);
 
             // Generate PlantUML only for code-only runs, straight from the official code model.
@@ -84,10 +87,12 @@ public class CompareServiceImpl implements CompareService {
             if (sel.codeOnly()) {
                 generatedPuml = new PlantUMLGenerator().generate(codeModel);
             }
-
+			
+			// Return all results back to the controller
             return new RunResult(consistent, sel.codeOnly(), sel.mode(), sum, diffs, reportText, generatedPuml, notices);
 
         } catch (IOException ex) {
+			// Error fallback result
             return new RunResult(
                     false, sel.codeOnly(), sel.mode(),
                     new Summary(0,0,0,0,0),
@@ -104,7 +109,7 @@ public class CompareServiceImpl implements CompareService {
         return lastCodeModel;
     }
 
-    // --- helpers (unchanged) ---
+    // --- helpers (file parsing, utilities) ---
 
     private static IntermediateModel parseSelectedJava(String root, List<String> fqcns) throws IOException {
         JavaSourceParser parser = new JavaSourceParser();

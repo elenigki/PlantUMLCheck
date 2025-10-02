@@ -11,13 +11,9 @@ import model.ClassInfo;
 
 import java.util.*;
 
-/** Attribute presence and contracts inside one class. */
 public final class AttributeCheck {
 
-	/**
-	 * Compares attributes for one class. (Used for STRICT and RELAXED; MINIMAL uses
-	 * AttributeCheckMinimal)
-	 */
+	//Compares attributes for one class. (Used for STRICT and RELAXED; MINIMAL uses AttributeCheckMinimal)
 	public static List<Difference> compareAttributesInClass(String className, ClassInfo codeC, ClassInfo umlC,
 			CheckMode mode) {
 		List<Difference> out = new ArrayList<>();
@@ -94,7 +90,7 @@ public final class AttributeCheck {
 		return out;
 	}
 
-	/** Builds name -> Attribute for quick lookups in a class. */
+	// Builds name -> Attribute for quick lookups in a class.
 	static Map<String, Attribute> byName(List<Attribute> list) {
 		Map<String, Attribute> m = new LinkedHashMap<>();
 		if (list == null)

@@ -4,10 +4,14 @@ import comparison.issues.Difference;
 import java.util.List;
 
 public interface CompareService {
+	
+	// Comparison modes from the UI, mapped later to CheckMode in the impl
+    enum Mode { STRICT, RELAXED, MINIMAL }
 
-    enum Mode { STRICT, RELAXED, MINIMAL } // formerly RELAXED_PLUS
-
+	// Keep last parsed Java code model (useful for UML generation later)
     model.IntermediateModel getLastCodeModel();
+	
+	// User selection coming from the UI (workspace, classes, mode, UML files...)
     record Selection(
             String workspaceRoot,
             List<String> selectedFqcns,
@@ -16,6 +20,7 @@ public interface CompareService {
             List<String> plantumlFiles
     ) {}
 
+	// Quick summary of results: how many classes matched/differed etc.
     record Summary(
             int codeClasses,
             int umlClasses,
@@ -24,6 +29,7 @@ public interface CompareService {
             int differences
     ) {}
 
+	// Full run result returned to UI layer
     record RunResult(
             boolean consistent,
             boolean codeOnly,
@@ -35,5 +41,6 @@ public interface CompareService {
             List<String> notices
     ) {}
 
+	// The main entrypoint: run comparison with given Selection
     RunResult run(Selection sel);
 }

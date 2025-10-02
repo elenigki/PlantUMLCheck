@@ -10,10 +10,10 @@ import model.RelationshipType;
 
 import java.util.*;
 
-/** Relationship checks across the whole model. */
+
 public final class RelationshipCheck {
 
-    /** Compares relationships between code and UML. */
+    // Compares relationships between code and UML.
     public static List<Difference> compareRelationships(IntermediateModel code,
                                                         IntermediateModel uml,
                                                         CheckMode mode) {
@@ -45,7 +45,7 @@ public final class RelationshipCheck {
         return out;
     }
 
-    /** Groups edges as A -> (B -> list of edges). */
+    // Groups edges as A -> (B -> list of edges).
     static Map<String, Map<String, List<Relationship>>> byPair(List<Relationship> rels) {
         Map<String, Map<String, List<Relationship>>> m = new LinkedHashMap<>();
         if (rels == null) return m;
@@ -61,7 +61,7 @@ public final class RelationshipCheck {
         return m;
     }
 
-    /** Compares inheritance/contract (extends/implements) for one A->B pair. */
+    // Compares inheritance/contract (extends/implements) for one A->B pair.
     static void compareInheritanceBetween(String a, String b,
                                           List<Relationship> codeEdges,
                                           List<Relationship> umlEdges,
@@ -115,7 +115,7 @@ public final class RelationshipCheck {
         }
     }
 
-    /** Compares ownership (composition > aggregation > association) for one A->B pair. */
+    // Compares ownership (composition > aggregation > association) for one A->B pair.
     static void compareOwnershipBetween(String a, String b,
                                         List<Relationship> codeEdges,
                                         List<Relationship> umlEdges,
@@ -184,7 +184,7 @@ public final class RelationshipCheck {
         // equal → OK
     }
 
-    /** Handles dependency policy. */
+    // Handles dependency policy.
     static void compareDependencyBetween(String a, String b,
                                          List<Relationship> codeEdges,
                                          List<Relationship> umlEdges,
