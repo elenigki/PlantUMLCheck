@@ -385,8 +385,10 @@ public class JavaSourceParser {
 			+ "(\\w+)\\s*\\(([^)]*)\\)\\s*" // (4) name, (5) params
 	);
 
-	private static final Pattern METHOD_HEADER_PATTERN = Pattern
-			.compile("\\b(public|private|protected)\\b.*\\(.*\\)\\s*(\\{)?\\s*$");
+	private static final Pattern METHOD_HEADER_PATTERN = Pattern.compile(
+		    "\\b(public|private|protected)\\b.*\\(.*\\)\\s*(?:throws\\s+[^\\{;]+)?\\s*(\\{)?\\s*$"
+		);
+
 
 	// NEW: very narrow pattern for ';'-terminated abstract/interface signatures
 	private static final Pattern ABSTRACT_SIGNATURE_PATTERN = Pattern.compile("^\\s*(?:@[\\w.]+\\s*)*" + // annotations
@@ -401,71 +403,78 @@ public class JavaSourceParser {
 
 	// Parses a full method body string into a Method object
 	private Method parseMethod(String methodBody, ClassInfo classInfo) {
-		String[] lines = methodBody.split("\\n");
-		if (lines.length == 0)
-			return null;
+	    String[] lines = methodBody.split("\\n");
+	    if (lines.length == 0)
+	        return null;
 
-		StringBuilder headerBuilder = new StringBuilder();
+	    StringBuilder headerBuilder = new StringBuilder();
 
-		// Join all lines of the header into a single string
-		for (String line : lines) {
-			String trimmed = line.trim();
-			if (trimmed.isEmpty())
-				continue;
+	    // Join all lines of the header into a single string
+	    for (String line : lines) {
+	        String trimmed = line.trim();
+	        if (trimmed.isEmpty())
+	            continue;
 
-			// Skip annotation lines
-			if (trimmed.startsWith("@"))
-				continue;
+	        // Skip annotation lines
+	        if (trimmed.startsWith("@"))
+	            continue;
 
-			headerBuilder.append(trimmed).append(" ");
+	        headerBuilder.append(trimmed).append(" ");
 
-			// Break after opening brace (assumes signature ends there)
-			if (trimmed.contains("{"))
-				break;
-		}
+	        // Break after opening brace (assumes signature ends there)
+	        if (trimmed.contains("{"))
+	            break;
+	    }
 
-		String headerLine = headerBuilder.toString().trim();
+	    String headerLine = headerBuilder.toString().trim();
 
-		// Match method signature
-		Matcher matcher = METHOD_PATTERN.matcher(headerLine);
-		if (!matcher.find()) {
-			return null;
-		}
+	    // [NEW] remove inline annotations at the very start (e.g., "@Override public ...")
+	    headerLine = headerLine.replaceFirst("^(@[\\w.]+(?:\\([^)]*\\))?\\s*)+", "");
 
-		String visibilityKeyword = matcher.group(1);
-		String modsRaw = matcher.group(2);
-		String returnType = normalizeType(matcher.group(3));
-		String methodName = matcher.group(4);
-		String paramList = matcher.group(5);
+	    // [NEW] drop optional 'throws ...' so METHOD_PATTERN matches like before
+	    String headerForMatch = headerLine.replaceAll("\\bthrows\\b\\s+[^\\{;]*", "").trim();
 
-		// === NEW: completely ignore main method ===
-		if ("main".equals(methodName) && "void".equals(returnType)) {
-			return null;
-		}
+	    // Match method signature
+	    Matcher matcher = METHOD_PATTERN.matcher(headerForMatch);
+	    if (!matcher.find()) {
+	        return null;
+	    }
 
-		boolean isConstructor = isConstructor(methodName, classInfo);
-		String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
-		Method method = new Method(methodName, returnType, visibility);
-		method.setStatic(hasStatic(modsRaw));
+	    String visibilityKeyword = matcher.group(1);
+	    String modsRaw = matcher.group(2);
+	    String returnType = normalizeType(matcher.group(3));
+	    String methodName = matcher.group(4);
+	    String paramList = matcher.group(5);
 
-		// Parse and track parameter types
-		Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
+	    // === NEW: completely ignore main method ===
+	    if ("main".equals(methodName) && "void".equals(returnType)) {
+	        return null;
+	    }
 
-		// Add dependency from return type (if not constructor)
-		if (!isConstructor) {
-			processReturnType(returnType, classInfo);
-		}
+	    boolean isConstructor = isConstructor(methodName, classInfo);
+	    String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
+	    Method method = new Method(methodName, returnType, visibility);
+	    method.setStatic(hasStatic(modsRaw));
 
-		// Analyze method body (for composition, aggregation, etc.)
-		analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
+	    // Parse and track parameter types
+	    Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
 
-		// Add method to class (constructors are excluded)
-		if (!isConstructor) {
-			classInfo.addMethod(method);
-		}
+	    // Add dependency from return type (if not constructor)
+	    if (!isConstructor) {
+	        processReturnType(returnType, classInfo);
+	    }
 
-		return method;
+	    // Analyze method body (for composition, aggregation, etc.)
+	    analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
+
+	    // Add method to class (constructors are excluded)
+	    if (!isConstructor) {
+	        classInfo.addMethod(method);
+	    }
+
+	    return method;
 	}
+
 
 	// NEW: picks up ';'-terminated interface method signatures (no body)
 	private void extractAbstractSignatures(List<String> lines, ClassInfo classInfo) {
