@@ -14,7 +14,6 @@ import generator.PlantUMLGenerator;
 @Controller
 public class ResultsController {
 
-    /** Results page */
     @GetMapping("/results")
     public String showResults(HttpSession session, Model model) {
         Object result = session.getAttribute("lastResult");
@@ -33,7 +32,7 @@ public class ResultsController {
         return "results";
     }
 
-    /** Export the comparison report as txt */
+    // Export the comparison report as txt
     @GetMapping("/results/report.txt")
     public ResponseEntity<String> downloadReport(HttpSession session) {
         String txt = (String) session.getAttribute("lastReportText");
@@ -44,7 +43,7 @@ public class ResultsController {
                 .body(txt);
     }
 
-    /** Export the last generated PlantUML */
+    //Export the last generated PlantUML
     @GetMapping("/results/uml.puml")
     public ResponseEntity<String> downloadUml(HttpSession session) {
         String puml = (String) session.getAttribute("lastGeneratedPuml");
@@ -55,10 +54,7 @@ public class ResultsController {
                 .body(puml);
     }
 
-    /**
-     * Comparison mode button: generate UML from the official code model and show it inline.
-     * (Same behavior as code-only; no reparse, no comparator influence.)
-     */
+    //  Comparison mode button: generate UML from the official code model and show it inline.
     @GetMapping("/results/generate-corrected")
     public String generateCorrectedAndShow(HttpSession session) {
         String puml = generateFromOfficialModel(session);
@@ -68,7 +64,7 @@ public class ResultsController {
 
     // ---------- helper ----------
 
-    /** Always use the official code model produced by the service. */
+    // Always use the official code model produced by the service.
     private String generateFromOfficialModel(HttpSession session) {
         IntermediateModel codeModel = (IntermediateModel) session.getAttribute("officialCodeModel");
         if (codeModel == null) return null; // nothing to generate

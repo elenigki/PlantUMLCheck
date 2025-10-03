@@ -48,7 +48,7 @@
     }
   }
 
-  // NEW: disable/enable Continue based on at least one class selected
+  // Disable/enable Continue based on at least one class selected
   function updateContinueState() {
     const hasAny = $$(".cls-checkbox").some((c) => c.checked);
     if (continueBtn) continueBtn.disabled = !hasAny;
