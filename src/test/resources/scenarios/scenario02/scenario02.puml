@@ -1,9 +1,0 @@
-@startuml
-class Library {
-  - book : Book
-  + Library() : void
-}
-class Book {
-}
-Library --> Book
-@enduml

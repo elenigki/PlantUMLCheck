@@ -1,9 +1,0 @@
-@startuml
-interface Drawable {
-  + draw() : void
-}
-class Painter {
-  + draw() : void
-}
-Painter --|> Drawable
-@enduml

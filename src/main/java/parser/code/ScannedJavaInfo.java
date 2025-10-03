@@ -1,4 +1,5 @@
 package parser.code;
+
 import model.ClassType;
 import java.io.File;
 
@@ -8,38 +9,38 @@ public class ScannedJavaInfo {
 	private String packageName;
 	private ClassType classType;
 	private File sourceFile;
-	
-    public ScannedJavaInfo(String fullyQualifiedName, String className, String packageName,
-            ClassType classType, File sourceFile) {
-    	this.fullyQualifiedName = fullyQualifiedName;
-    	this.className = className;
-    	this.packageName = packageName;
-    	this.classType = classType;
-    	this.sourceFile = sourceFile;
-    }
 
-    public String getFullyQualifiedName() {
-        return fullyQualifiedName;
-    }
+	public ScannedJavaInfo(String fullyQualifiedName, String className, String packageName, ClassType classType,
+			File sourceFile) {
+		this.fullyQualifiedName = fullyQualifiedName;
+		this.className = className;
+		this.packageName = packageName;
+		this.classType = classType;
+		this.sourceFile = sourceFile;
+	}
 
-    public String getClassName() {
-        return className;
-    }
+	public String getFullyQualifiedName() {
+		return fullyQualifiedName;
+	}
 
-    public String getPackageName() {
-        return packageName;
-    }
+	public String getClassName() {
+		return className;
+	}
 
-    public ClassType getClassType() {
-        return classType;
-    }
+	public String getPackageName() {
+		return packageName;
+	}
 
-    public File getSourceFile() {
-        return sourceFile;
-    }
+	public ClassType getClassType() {
+		return classType;
+	}
 
-    @Override
-    public String toString() {
-        return classType + " " + fullyQualifiedName;
-    }
+	public File getSourceFile() {
+		return sourceFile;
+	}
+
+	@Override
+	public String toString() {
+		return classType + " " + fullyQualifiedName;
+	}
 }

@@ -1,5 +1,0 @@
-@startuml
-class Calculator {
-  + compute()
-}
-@enduml

@@ -6,10 +6,9 @@ import java.util.regex.*;
 public final class JavaParsingUtils {
 
 	private JavaParsingUtils() {
-		// static-only class
 	}
 
-	// Removes generic type parameters: List<String> → List
+	// Removes generic type parameters: List<String> --> List
 	public static String stripGenerics(String type) {
 		return type.replaceAll("<.*?>", "");
 	}
@@ -45,21 +44,21 @@ public final class JavaParsingUtils {
 		}
 		return open - close;
 	}
+	
 
+	// -------------------- helpers (grouped) --------------------
+	
+	
 	public static Set<String> extractGenericTypesFromTypeSignature(String type) {
 
-		System.out.println("\n[extractGenericTypesFromTypeSignature] Input type: " + type);
 		Set<String> result = new HashSet<>();
 		String normalized = type.replaceAll("[<>]", " ").replaceAll(",", " ");
-		System.out.println("[extractGenericTypesFromTypeSignature] Normalized: " + normalized);
 
 		Matcher matcher = Pattern.compile("[A-Z][a-zA-Z0-9_]*").matcher(normalized);
 		while (matcher.find()) {
 			String extracted = matcher.group();
 			result.add(extracted);
-			System.out.println("[extractGenericTypesFromTypeSignature] → Found: " + extracted);
 		}
-		System.out.println("[extractGenericTypesFromTypeSignature] Final result: " + result);
 		return result;
 	}
 
@@ -68,13 +67,14 @@ public final class JavaParsingUtils {
 	}
 
 	public static String normalizeMods(String mods) {
-	    if (mods == null) return " ";
-	    String norm = mods.trim().replaceAll("\\s+", " ");
-	    return " " + norm + " ";
-	}
-	public static boolean hasStatic(String mods) {
-	    return normalizeMods(mods).contains(" static ");
+		if (mods == null)
+			return " ";
+		String norm = mods.trim().replaceAll("\\s+", " ");
+		return " " + norm + " ";
 	}
 
+	public static boolean hasStatic(String mods) {
+		return normalizeMods(mods).contains(" static ");
+	}
 
 }

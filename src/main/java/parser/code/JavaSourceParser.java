@@ -9,19 +9,15 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * JavaSourceParser parses one or more Java files and builds an
- * IntermediateModel with classes, attributes, and relationships.
- */
 public class JavaSourceParser {
 
 	private final IntermediateModel model;
-	private final JavaSourcePreprocessor preprocessor = new JavaSourcePreprocessor();
-	private final boolean enableMultiCommand = false; // gate for experimental splitting
+	private final JavaSourcePreprocessor preprocessor;
 
 	// Initializes empty model and warnings
 	public JavaSourceParser() {
 		this.model = new IntermediateModel(ModelSource.SOURCE_CODE);
+		this.preprocessor = new JavaSourcePreprocessor();
 	}
 
 	// Parses one Java file
@@ -78,56 +74,31 @@ public class JavaSourceParser {
 				String enumBody = String.join("\n", bodyLines);
 				enumBody = enumBody.replaceFirst("\\s*\\}\\s*$", "");
 				if (classInfo.getClassType() == ClassType.ENUM) {
-				    addEnumConstantsToClassInfo(enumBody, classInfo);
+					addEnumConstantsToClassInfo(enumBody, classInfo);
 				}
 
-
-				// decide per-class if we need multi-command normalization
-				boolean needMulti = enableMultiCommand && preprocessor.detectMultiCommand(bodyLines);
-
-				// --- pipeline with debug prints ---
 				// (A) optional: very conservative pre-split only when needed
-				List<String> bodyStage = needMulti ? preprocessor.preSplitLight(bodyLines) : bodyLines;
+				List<String> bodyStage = bodyLines;
 
 				List<String> noComments = preprocessor.cleanComments(bodyStage);
-				System.out.println("noComments (" + classInfo.getName() + "):");
-				noComments.forEach(s -> System.out.println("  · " + s));
 
 				// (B) optional top-level per-line split (safe) only when needed
-				List<String> preExpanded = needMulti ? preprocessor.splitTopLevelPerLine(noComments) : noComments;
-				System.out.println("preExpanded (" + classInfo.getName() + "):");
-				preExpanded.forEach(s -> System.out.println("  · " + s));
+				List<String> preExpanded = noComments;
 
 				List<String> logicalLines = preprocessor.joinLogicalLines(preExpanded);
-				System.out.println("logicalLines (" + classInfo.getName() + "):");
-				logicalLines.forEach(s -> System.out.println("  · " + s));
 
-				List<String> expanded = needMulti ? preprocessor.splitTopLevelPerLine(logicalLines) : logicalLines;
-				System.out.println("expanded (" + classInfo.getName() + "):");
-				expanded.forEach(s -> System.out.println("  · " + s));
+				List<String> expanded = logicalLines;
 
 				// (C) optional header/body normalizers only when needed
-				List<String> normalized = needMulti ? preprocessor.separateMemberHeaders(expanded) : expanded;
-				System.out.println("normalized (" + classInfo.getName() + "):");
-				normalized.forEach(s -> System.out.println("  · " + s));
+				List<String> normalized = expanded;
 
-				List<String> methodSplit = needMulti ? preprocessor.splitMethodBodies(normalized) : normalized;
-				System.out.println("methodSplit (" + classInfo.getName() + "):");
-				methodSplit.forEach(s -> System.out.println("  · " + s));
+				List<String> methodSplit = normalized;
 
-				// List<String> completed = needMulti ?
 				// preprocessor.closeDanglingMethodHeaders(methodSplit) : methodSplit;
 				List<String> completed = methodSplit;
-				System.out.println("completed (" + classInfo.getName() + "):");
-				completed.forEach(s -> System.out.println("  · " + s));
 
-				// (D) legacy splitter always last
+				// (D) final splitting step
 				List<String> splitLines = preprocessor.splitMultipleStatements(completed);
-				System.out.println("splitLines FINAL (" + classInfo.getName() + "):");
-				splitLines.forEach(s -> System.out.println("  · " + s));
-
-				System.out.println("needMulti=" + needMulti + "  enableMultiCommand=" + enableMultiCommand);
-				System.out.println("--------------------------------------------");
 
 				// parse
 				parseAttributes(splitLines, classInfo);
@@ -345,12 +316,20 @@ public class JavaSourceParser {
 							if (target != null) {
 								boolean isInComposedStructure = isMainComposed && declared.contains(cleaned);
 
-								// Enums must never produce COMPOSITION/AGGREGATION → force ASSOCIATION
+								// Enums must never produce COMPOSITION/AGGREGATION --> force ASSOCIATION
 								boolean enumInvolved = classInfo.getClassType() == ClassType.ENUM
 										|| target.getClassType() == ClassType.ENUM;
-								RelationshipType relType = enumInvolved ? RelationshipType.ASSOCIATION
-										: (isInComposedStructure ? RelationshipType.COMPOSITION
-												: RelationshipType.ASSOCIATION);
+
+								RelationshipType relType;
+								if (enumInvolved) {
+									relType = RelationshipType.ASSOCIATION;
+								} else if (attr.isStatic()) {
+									relType = RelationshipType.DEPENDENCY; // static field ⇒ DEPENDENCY
+								} else if (isInComposedStructure) {
+									relType = RelationshipType.COMPOSITION;
+								} else {
+									relType = RelationshipType.ASSOCIATION;
+								}
 
 								model.addRelationship(new Relationship(classInfo, target, relType));
 							}
@@ -362,18 +341,20 @@ public class JavaSourceParser {
 		}
 	}
 
-	// Collect enum constants and store them in ClassInfo.enumConstants (not as attributes)
+	// Collect enum constants and store them in ClassInfo.enumConstants (not as
+	// attributes)
 	private static void addEnumConstantsToClassInfo(String enumBody, ClassInfo enumInfo) {
-	    String header = enumConstantsHeader(enumBody);
-	    if (header == null || header.isBlank()) return;
+		String header = enumConstantsHeader(enumBody);
+		if (header == null || header.isBlank())
+			return;
 
-	    for (String token : splitTopLevelByComma(header)) {
-	        String name = enumConstantName(token);
-	        if (name == null) continue;
-	        enumInfo.addEnumConstants(name); // <<— uses your new API
-	    }
+		for (String token : splitTopLevelByComma(header)) {
+			String name = enumConstantName(token);
+			if (name == null)
+				continue;
+			enumInfo.addEnumConstants(name);
+		}
 	}
-
 
 	// ==========================
 	// Method extraction patterns
@@ -385,12 +366,9 @@ public class JavaSourceParser {
 			+ "(\\w+)\\s*\\(([^)]*)\\)\\s*" // (4) name, (5) params
 	);
 
-	private static final Pattern METHOD_HEADER_PATTERN = Pattern.compile(
-		    "\\b(public|private|protected)\\b.*\\(.*\\)\\s*(?:throws\\s+[^\\{;]+)?\\s*(\\{)?\\s*$"
-		);
+	private static final Pattern METHOD_HEADER_PATTERN = Pattern
+			.compile("\\b(public|private|protected)\\b.*\\(.*\\)\\s*(?:throws\\s+[^\\{;]+)?\\s*(\\{)?\\s*$");
 
-
-	// NEW: very narrow pattern for ';'-terminated abstract/interface signatures
 	private static final Pattern ABSTRACT_SIGNATURE_PATTERN = Pattern.compile("^\\s*(?:@[\\w.]+\\s*)*" + // annotations
 																											// (optional)
 			"(?:public|protected|private)?\\s*" + // visibility (optional)
@@ -403,80 +381,79 @@ public class JavaSourceParser {
 
 	// Parses a full method body string into a Method object
 	private Method parseMethod(String methodBody, ClassInfo classInfo) {
-	    String[] lines = methodBody.split("\\n");
-	    if (lines.length == 0)
-	        return null;
+		String[] lines = methodBody.split("\\n");
+		if (lines.length == 0)
+			return null;
 
-	    StringBuilder headerBuilder = new StringBuilder();
+		StringBuilder headerBuilder = new StringBuilder();
 
-	    // Join all lines of the header into a single string
-	    for (String line : lines) {
-	        String trimmed = line.trim();
-	        if (trimmed.isEmpty())
-	            continue;
+		// Join all lines of the header into a single string
+		for (String line : lines) {
+			String trimmed = line.trim();
+			if (trimmed.isEmpty())
+				continue;
 
-	        // Skip annotation lines
-	        if (trimmed.startsWith("@"))
-	            continue;
+			// Skip annotation lines
+			if (trimmed.startsWith("@"))
+				continue;
 
-	        headerBuilder.append(trimmed).append(" ");
+			headerBuilder.append(trimmed).append(" ");
 
-	        // Break after opening brace (assumes signature ends there)
-	        if (trimmed.contains("{"))
-	            break;
-	    }
+			// Break after opening brace (assumes signature ends there)
+			if (trimmed.contains("{"))
+				break;
+		}
 
-	    String headerLine = headerBuilder.toString().trim();
+		String headerLine = headerBuilder.toString().trim();
 
-	    // [NEW] remove inline annotations at the very start (e.g., "@Override public ...")
-	    headerLine = headerLine.replaceFirst("^(@[\\w.]+(?:\\([^)]*\\))?\\s*)+", "");
+		// Remove inline annotations at the start (e.g., "@Override public ...")
+		headerLine = headerLine.replaceFirst("^(@[\\w.]+(?:\\([^)]*\\))?\\s*)+", "");
 
-	    // [NEW] drop optional 'throws ...' so METHOD_PATTERN matches like before
-	    String headerForMatch = headerLine.replaceAll("\\bthrows\\b\\s+[^\\{;]*", "").trim();
+		// Remove optional 'throws ...' so METHOD_PATTERN can match
+		String headerForMatch = headerLine.replaceAll("\\bthrows\\b\\s+[^\\{;]*", "").trim();
 
-	    // Match method signature
-	    Matcher matcher = METHOD_PATTERN.matcher(headerForMatch);
-	    if (!matcher.find()) {
-	        return null;
-	    }
+		// Match method signature
+		Matcher matcher = METHOD_PATTERN.matcher(headerForMatch);
+		if (!matcher.find()) {
+			return null;
+		}
 
-	    String visibilityKeyword = matcher.group(1);
-	    String modsRaw = matcher.group(2);
-	    String returnType = normalizeType(matcher.group(3));
-	    String methodName = matcher.group(4);
-	    String paramList = matcher.group(5);
+		String visibilityKeyword = matcher.group(1);
+		String modsRaw = matcher.group(2);
+		String returnType = normalizeType(matcher.group(3));
+		String methodName = matcher.group(4);
+		String paramList = matcher.group(5);
 
-	    // === NEW: completely ignore main method ===
-	    if ("main".equals(methodName) && "void".equals(returnType)) {
-	        return null;
-	    }
+		// === NEW: completely ignore main method ===
+		if ("main".equals(methodName) && "void".equals(returnType)) {
+			return null;
+		}
 
-	    boolean isConstructor = isConstructor(methodName, classInfo);
-	    String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
-	    Method method = new Method(methodName, returnType, visibility);
-	    method.setStatic(hasStatic(modsRaw));
+		boolean isConstructor = isConstructor(methodName, classInfo);
+		String visibility = visibilitySymbol(visibilityKeyword != null ? visibilityKeyword : "");
+		Method method = new Method(methodName, returnType, visibility);
+		method.setStatic(hasStatic(modsRaw));
 
-	    // Parse and track parameter types
-	    Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
+		// Parse and track parameter types
+		Map<String, String> paramNamesAndTypes = parseParameters(paramList, method, classInfo, isConstructor);
 
-	    // Add dependency from return type (if not constructor)
-	    if (!isConstructor) {
-	        processReturnType(returnType, classInfo);
-	    }
+		// Add dependency from return type (if not constructor)
+		if (!isConstructor) {
+			processReturnType(returnType, classInfo);
+		}
 
-	    // Analyze method body (for composition, aggregation, etc.)
-	    analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
+		// Analyze method body (for composition, aggregation, etc.)
+		analyzeMethodBody(methodBody, classInfo, methodName, paramNamesAndTypes);
 
-	    // Add method to class (constructors are excluded)
-	    if (!isConstructor) {
-	        classInfo.addMethod(method);
-	    }
+		// Add method to class (constructors are excluded)
+		if (!isConstructor) {
+			classInfo.addMethod(method);
+		}
 
-	    return method;
+		return method;
 	}
 
-
-	// NEW: picks up ';'-terminated interface method signatures (no body)
+	// Picks up ';'-terminated interface method signatures (no body)
 	private void extractAbstractSignatures(List<String> lines, ClassInfo classInfo) {
 		// Only consider interface members here to keep pattern scope tight
 		if (classInfo == null || classInfo.getClassType() != ClassType.INTERFACE) {
@@ -579,7 +556,6 @@ public class JavaSourceParser {
 	}
 
 	private void processReturnType(String returnType, ClassInfo classInfo) {
-
 		if (returnType == null || returnType.equals("void"))
 			return;
 
@@ -605,7 +581,7 @@ public class JavaSourceParser {
 
 	}
 
-	// Extracts inner type from generics: List<People> → People
+	// Extracts inner type from generics: List<People> --> People
 	private String extractInnerType(String type) {
 		Matcher m = Pattern.compile("<\\s*(\\w+)\\s*>").matcher(type);
 		if (m.find()) {
@@ -625,7 +601,7 @@ public class JavaSourceParser {
 		while (matcher.find()) {
 			String rawType = matcher.group(1);
 
-			// Remove generic part, e.g. List<Book> → List
+			// Remove generic part, e.g. List<Book> --> List
 			String cleaned = stripGenerics(rawType);
 
 			// Ignore built-in types like List, Map, etc.
@@ -749,7 +725,7 @@ public class JavaSourceParser {
 		while (matcher.find()) {
 			String fieldName = matcher.group(1);
 			String rawType = matcher.group(2);
-			String cleaned = stripGenerics(rawType); // e.g. List<Book> → List
+			String cleaned = stripGenerics(rawType); // e.g. List<Book> --> List
 
 			if (isJavaBuiltInType(cleaned))
 				continue;
@@ -759,10 +735,10 @@ public class JavaSourceParser {
 			if (targetClass == null)
 				continue;
 
-			RelationshipType rt = (fld != null && fld.isStatic()) ? RelationshipType.ASSOCIATION // static fields never
-																									// imply composition
+			RelationshipType rt = (fld != null && fld.isStatic()) ? RelationshipType.DEPENDENCY // static fields never
+																								// imply composition
 					: RelationshipType.COMPOSITION;
-			// Enums: always ASSOCIATION (no composition with enums)
+			// Enums: always ASSOCIATION
 			if (currentClass.getClassType() == ClassType.ENUM
 					|| (targetClass != null && targetClass.getClassType() == ClassType.ENUM)) {
 				rt = RelationshipType.ASSOCIATION;
@@ -788,7 +764,7 @@ public class JavaSourceParser {
 			String paramName = param.getKey();
 			String paramType = param.getValue();
 
-			// e.g., List<Book> → [List, Book]
+			// e.g., List<Book> --> [List, Book]
 			Set<String> types = extractGenericTypes(paramType);
 			for (String raw : types) {
 				String cleaned = stripGenerics(raw);
@@ -806,13 +782,13 @@ public class JavaSourceParser {
 					String fieldName = m.group(1);
 					Attribute fld = findAttributeByName(currentClass, fieldName);
 
-					RelationshipType rt = (fld != null && fld.isStatic()) ? RelationshipType.ASSOCIATION // static
-																											// fields
-																											// never
-																											// imply
-																											// aggregation
+					RelationshipType rt = (fld != null && fld.isStatic()) ? RelationshipType.DEPENDENCY // static
+																										// fields
+																										// never
+																										// imply
+																										// aggregation
 							: RelationshipType.AGGREGATION;
-					// Enums: always ASSOCIATION (no aggregation with enums)
+					// Enums: always ASSOCIATION
 					if (currentClass.getClassType() == ClassType.ENUM
 							|| (target != null && target.getClassType() == ClassType.ENUM)) {
 						rt = RelationshipType.ASSOCIATION;
@@ -959,7 +935,7 @@ public class JavaSourceParser {
 				return enumBody.substring(0, i);
 			}
 		}
-		return enumBody; // no ';' → constants-only enum
+		return enumBody; // no ';' --> constants-only enum
 	}
 
 	// Split by commas at top-level (ignoring commas inside (...) or {...})
