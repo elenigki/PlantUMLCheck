@@ -13,33 +13,23 @@ import model.ModelSource;
 import model.Relationship;
 import model.RelationshipType;
 
-/**
- * PlantUMLGenerator
- *
- * Generates a PlantUML class diagram script from an IntermediateModel built
- * from source code. The output is deterministic and ready to paste into the
- * PlantUML server (no syntax errors).
- */
+
 public final class PlantUMLGenerator {
 
 	public static final class Options {
-	    /** If true, omit private members. */
+	    //If true, omit private members.
 	    public boolean excludePrivate = false;
-	    /** If true, omit package-private members. */
+	    // If true, omit package-private members.
 	    public boolean excludePackagePrivate = false;
-	    /** If true, include only OFFICIAL classes (skip DUMMY). Default true. */
+	    // If true, include only OFFICIAL classes (skip DUMMY). Default true.
 	    public boolean onlyOfficialClasses = true;
-	    /**
-	     * When true and onlyOfficialClasses is true, also include DUMMY classes as
-	     * skeleton nodes (no members), marked with <<external>>.
-	     * Default: true.
-	     */
+	    // When true and onlyOfficialClasses is true, also include DUMMY classes as skeleton nodes (no members), marked with <<external>>. Default: true.
 	    public boolean showDummySkeletons = true;
-	    /** If true, include relationships only when both endpoints are included classes. */
+	    // If true, include relationships only when both endpoints are included classes.
 	    public boolean pruneDanglingRelationships = true;
-	    /** When true, add conservative skinparams for better readability. */
+	    // When true, add conservative skinparams for better readability.
 	    public boolean addSkinParams = true;
-	    /** When true, add header comment banner. */
+	    // When true, add header comment banner.
 	    public boolean addHeaderComment = true;
 	}
 
@@ -54,20 +44,14 @@ public final class PlantUMLGenerator {
 		this.options = options == null ? new Options() : options;
 	}
 
-	/** Main entry point. */
+	// Main entry point.
 	public String generate(IntermediateModel originalModel) {
 		if (originalModel == null) {
 			throw new IllegalArgumentException("model is null");
 		}
-		System.out.println("Model relationships: ");
-		for (Relationship r : originalModel.getRelationships()) {
-			System.out.println("Source: " + r.getSourceClass() + " , Target: " + r.getTargetClass()
-					+ " , Relationship: " + r.getType());
-		}
 
 		IntermediateModel model = withNormalizedRelationships(originalModel);
 
-		// DEBUG: counts
 		Map<RelationshipType, Long> counts = new EnumMap<>(RelationshipType.class);
 		for (Relationship r : model.getRelationships()) {
 			counts.merge(r.getType(), 1L, Long::sum);
@@ -133,9 +117,6 @@ public final class PlantUMLGenerator {
 					// Left-pointing for inheritance; parent (target) first.
 					arrow = (rt == RelationshipType.GENERALIZATION) ? "<|--" : "<|..";
 
-					// DEBUG
-					System.out.println("[REL][emit] " + dstName + " " + arrow + " " + srcName + " (" + rt + ")");
-
 					sb.append(quoteIfNeeded(dstName)).append(' ').append(arrow).append(' ')
 							.append(quoteIfNeeded(srcName)).append('\n');
 				} else {
@@ -143,14 +124,11 @@ public final class PlantUMLGenerator {
 					if (arrow == null)
 						continue;
 
-					// DEBUG
-					System.out.println("[REL][emit] " + srcName + " " + arrow + " " + dstName + " (" + rt + ")");
-
 					sb.append(quoteIfNeeded(srcName)).append(' ').append(arrow).append(' ')
 							.append(quoteIfNeeded(dstName)).append('\n');
 				}
-			} // ← closes for (Relationship r : rels)
-		} // ← closes if (!rels.isEmpty())
+			}
+		}
 
 		sb.append("@enduml").append('\n');
 		return sb.toString();
@@ -158,10 +136,7 @@ public final class PlantUMLGenerator {
 
 	// --- Preprocessing methods ---
 
-	/**
-	 * Returns a NEW IntermediateModel with relationships normalized. Classes are
-	 * reused as-is; only the relationships list is rebuilt.
-	 */
+	// Returns a NEW IntermediateModel with relationships normalized. Classes are reused as-is; only the relationships list is rebuilt.
 	public IntermediateModel withNormalizedRelationships(IntermediateModel original) {
 		if (original == null)
 			return null;
@@ -180,21 +155,20 @@ public final class PlantUMLGenerator {
 
 	// --- INTERNALS ---
 
-	/**
-	 * Normalizes relationships so that: - DEPENDENCY is removed, - per (source ->
-	 * target) and per family only the strongest remains, - inheritance family is
-	 * validated/coerced based on class kinds, - ownership family uses composition >
-	 * aggregation > association, - duplicates are collapsed, - self loops are
-	 * ignored.
-	 */
+	// Normalizes relationships per family ,so only the strongest remains, duplicates are collapsed and self loops are ignored.
 	private List<Relationship> normalizeRelationships(IntermediateModel model) {
 		List<Relationship> all = model.getRelationships();
 		if (all == null || all.isEmpty())
 			return Collections.emptyList();
 
 		// Strength for ownership family
-		Map<RelationshipType, Integer> ownStrength = Map.of(RelationshipType.ASSOCIATION, 1,
-				RelationshipType.AGGREGATION, 2, RelationshipType.COMPOSITION, 3);
+		Map<RelationshipType, Integer> ownStrength = Map.of(
+		    RelationshipType.DEPENDENCY,   0,
+		    RelationshipType.ASSOCIATION,  1,
+		    RelationshipType.AGGREGATION,  2,
+		    RelationshipType.COMPOSITION,  3
+		);
+
 
 		// Keyed by (srcName, tgtName)
 		final class Key {
@@ -242,22 +216,20 @@ public final class PlantUMLGenerator {
 			if (type == null)
 				continue;
 
-			// Drop dependency entirely
-			if (type == RelationshipType.DEPENDENCY)
-				continue;
-
 			Key key = new Key(src, tgt);
 			endpoints.putIfAbsent(key, new ClassInfo[] { src, tgt });
 
 			// Ownership family
-			if (type == RelationshipType.ASSOCIATION || type == RelationshipType.AGGREGATION
-					|| type == RelationshipType.COMPOSITION) {
+			if (type == RelationshipType.DEPENDENCY
+			        || type == RelationshipType.ASSOCIATION
+			        || type == RelationshipType.AGGREGATION
+			        || type == RelationshipType.COMPOSITION) {
 
-				RelationshipType current = chosenOwnership.get(key);
-				if (current == null || ownStrength.get(type) > ownStrength.get(current)) {
-					chosenOwnership.put(key, type);
-				}
-				continue;
+			    RelationshipType current = chosenOwnership.get(key);
+			    if (current == null || ownStrength.get(type) > ownStrength.get(current)) {
+			        chosenOwnership.put(key, type);
+			    }
+			    continue;
 			}
 
 			// Inheritance family
@@ -271,8 +243,7 @@ public final class PlantUMLGenerator {
 			}
 		}
 
-		// Rebuild final list (at most 2 edges per pair: one ownership and one
-		// inheritance)
+		// Rebuild final list (at most 2 edges per pair: one ownership and one inheritance)
 		List<Relationship> result = new ArrayList<>(chosenOwnership.size() + chosenInheritance.size());
 		for (Map.Entry<Key, RelationshipType> e : chosenOwnership.entrySet()) {
 			ClassInfo[] ends = endpoints.get(e.getKey());
@@ -285,12 +256,7 @@ public final class PlantUMLGenerator {
 		return result;
 	}
 
-	/**
-	 * Validates + coerces inheritance type for (src -> tgt) purely from ClassType:
-	 * - CLASS -> CLASS => GENERALIZATION (extends) - CLASS -> INTERFACE =>
-	 * REALIZATION (implements) - INTERFACE -> INTERFACE => GENERALIZATION (extends)
-	 * - Anything else => invalid (null)
-	 */
+
 	private RelationshipType normalizeInheritanceType(ClassInfo src, ClassInfo tgt) {
 		if (src == null || tgt == null)
 			return null;
