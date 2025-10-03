@@ -1,17 +1,17 @@
 package model;
 
 public class Attribute {
-    private String name;
-    private String type; // int, String, etc
-    private String visibility; // - + #
-    private boolean isStatic;
-    
-    public Attribute(String name, String type, String visibility) {
-        this.name = name;
-        this.type = type;
-        this.visibility = visibility;
-        this.isStatic = false;
-    }
+	private String name;
+	private String type; // int, String, etc
+	private String visibility; // - + #
+	private boolean isStatic;
+
+	public Attribute(String name, String type, String visibility) {
+		this.name = name;
+		this.type = type;
+		this.visibility = visibility;
+		this.isStatic = false;
+	}
 
 	public String getName() {
 		return name;
@@ -28,11 +28,11 @@ public class Attribute {
 	public void setType(String type) {
 		this.type = type;
 	}
-	
-    public String getVisibility() {
-        return visibility;
-    }
-    
+
+	public String getVisibility() {
+		return visibility;
+	}
+
 	public boolean isStatic() {
 		return isStatic;
 	}
@@ -41,4 +41,3 @@ public class Attribute {
 		this.isStatic = isStatic;
 	}
 }
-
