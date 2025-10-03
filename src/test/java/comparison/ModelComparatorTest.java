@@ -16,9 +16,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static testutil.TestModelBuilder.*;
 
-/**
- * Smoke tests to prove wiring + basic rules work (Strict / Relaxed / Minimal).
- */
 public class ModelComparatorTest {
 
 	@Test
@@ -528,8 +525,7 @@ public class ModelComparatorTest {
 		assertTrue(d.getWhere().startsWith("AccountService#export("));
 	}
 
-	// ====================== RELAXED: relationship-only softening
-	// ======================
+	// ====================== RELAXED: relationship-only softening ======================
 
 	@Test
 	void relaxed_ownership_codeComposition_vs_umlAssociation_warning() {
