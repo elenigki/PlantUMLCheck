@@ -56,7 +56,6 @@ public final class PlantUMLGenerator {
 		for (Relationship r : model.getRelationships()) {
 			counts.merge(r.getType(), 1L, Long::sum);
 		}
-		System.out.println("[REL][gen] inputCounts=" + counts);
 
 		StringBuilder sb = new StringBuilder(8_192);
 		sb.append("@startuml").append('\n');
