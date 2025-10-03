@@ -14,7 +14,6 @@ import java.util.*;
 
 public final class MethodCheck {
 
-	//Compares methods for one class. (Used for STRICT and RELAXED; MINIMAL uses MethodCheckMinimal)
 	public static List<Difference> compareMethodsInClass(String className, ClassInfo codeC, ClassInfo umlC,
 			CheckMode mode) {
 		List<Difference> out = new ArrayList<>();
@@ -52,24 +51,24 @@ public final class MethodCheck {
 			} else {
 				int ur = rank(uVis), cr = rank(cVis);
 				if (ur > cr) {
-					// UML less public than code → ERROR
+					// UML less public than code -> ERROR
 					out.add(new Difference(IssueKind.METHOD_MISMATCH, IssueLevel.ERROR,
 							className + "#" + SignatureRules.signatureOf(U),
 							"UML visibility is more restrictive than code", uVis, cVis,
 							"Make UML at least as visible as the code"));
 				} else if (ur < cr) {
-					// UML more public than code → WARNING
+					// UML more public than code -> WARNING
 					out.add(new Difference(IssueKind.METHOD_MISMATCH, IssueLevel.WARNING,
 							className + "#" + SignatureRules.signatureOf(U),
 							"UML visibility is less restrictive than code", uVis, cVis,
 							"Consider aligning UML visibility with code"));
 				}
-				// equal → OK
+				// equal --> OK
 			}
 
 			// ---- static check (expects Method.isStatic(): Boolean)
-			// Rule: if code is static and UML omits static → ERROR (STRICT/RELAXED)
-			// if UML writes static and it differs from code → ERROR
+			// Rule: if code is static and UML omits static -> ERROR (STRICT/RELAXED)
+			// if UML writes static and it differs from code -> ERROR
 			Boolean uStat = U.isStatic(); // may be null (omitted in UML)
 			Boolean cStat = C.isStatic(); // expected non-null true/false on code side
 			boolean codeStatic = Boolean.TRUE.equals(cStat);
@@ -88,8 +87,7 @@ public final class MethodCheck {
 
 			Method C = cm.get(sigC);
 
-			// Keep the classic suppression: if UML has same name+arity overload, skip
-			// symmetric missing.
+			// Keep the classic suppression
 			if (umlHasSameNameArity(umlC.getMethods(), C))
 				continue;
 

@@ -13,7 +13,7 @@ import java.util.*;
 
 public final class AttributeCheck {
 
-	//Compares attributes for one class. (Used for STRICT and RELAXED; MINIMAL uses AttributeCheckMinimal)
+	// Compares attributes for one class. (Used for STRICT and RELAXED; MINIMAL uses AttributeCheckMinimal)
 	public static List<Difference> compareAttributesInClass(String className, ClassInfo codeC, ClassInfo umlC,
 			CheckMode mode) {
 		List<Difference> out = new ArrayList<>();
@@ -51,22 +51,22 @@ public final class AttributeCheck {
 			} else {
 				int ur = rank(uVis), cr = rank(cVis);
 				if (ur > cr) {
-					// UML is less public than code → ERROR
+					// UML is less public than code --> ERROR
 					out.add(new Difference(IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.ERROR, className + ".attr:" + name,
 							"UML visibility is more restrictive than code", uVis, cVis,
 							"Make UML at least as visible as the code"));
 				} else if (ur < cr) {
-					// UML is more public than code → WARNING
+					// UML is more public than code --> WARNING
 					out.add(new Difference(IssueKind.ATTRIBUTE_MISMATCH, IssueLevel.WARNING,
 							className + ".attr:" + name, "UML visibility is less restrictive than code", uVis, cVis,
 							"Consider aligning UML visibility with code"));
 				}
-				// equal → OK
+				// equal --> OK
 			}
 
 			// ---- static check (expects Attribute#getIsStatic(): Boolean)
-			// Rule: if code is static and UML omits static → ERROR (STRICT/RELAXED)
-			// if UML writes static and it differs from code → ERROR
+			// Rule: if code is static and UML omits static --> ERROR (STRICT/RELAXED)
+			// if UML writes static and it differs from code --> ERROR
 			Boolean uStat = U.isStatic(); // may be null (omitted in UML)
 			Boolean cStat = C.isStatic(); // expected non-null true/false on code side
 			boolean codeStatic = Boolean.TRUE.equals(cStat);
@@ -78,7 +78,7 @@ public final class AttributeCheck {
 			}
 		}
 
-		// Code -> UML (missing in UML) — RELAXED == STRICT for members
+		// Code --> UML (missing in UML) — RELAXED == STRICT for members
 		for (String name : ca.keySet()) {
 			if (!ua.containsKey(name)) {
 				out.add(new Difference(IssueKind.ATTRIBUTE_MISSING_IN_UML, IssueLevel.ERROR,
@@ -90,7 +90,7 @@ public final class AttributeCheck {
 		return out;
 	}
 
-	// Builds name -> Attribute for quick lookups in a class.
+	// Builds name --> Attribute for quick lookups in a class.
 	static Map<String, Attribute> byName(List<Attribute> list) {
 		Map<String, Attribute> m = new LinkedHashMap<>();
 		if (list == null)

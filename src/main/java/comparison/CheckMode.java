@@ -1,7 +1,5 @@
 package comparison;
 
 public enum CheckMode {
-    STRICT,
-    RELAXED,
-    MINIMAL
+	STRICT, RELAXED, MINIMAL
 }

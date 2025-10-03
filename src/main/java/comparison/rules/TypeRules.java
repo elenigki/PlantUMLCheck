@@ -9,7 +9,7 @@ public final class TypeRules {
         return norm(a).equals(norm(b));
     }
 
-    // Relaxed compatibility (wrapper/fqcn/simple, generic erasure, varargs≈array, arrays).
+    // Relaxed compatibility
     public static boolean equalRelaxed(String a, String b) {
         String A = norm(a), B = norm(b);
 

@@ -1,6 +1,5 @@
 package comparison.issues;
 
-/** Keeps one difference from the check (with both sides when useful). */
 public final class Difference {
   private final IssueKind kind;     // what type of issue this is
   private final IssueLevel level;   // how serious it is

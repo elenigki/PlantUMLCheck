@@ -18,42 +18,42 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-// Compares code vs UML and collects differences.
 public class ModelComparator {
 
-    private final CheckMode mode;  // STRICT, RELAXED, MINIMAL
+	private final CheckMode mode; // STRICT, RELAXED, MINIMAL
 
-    public ModelComparator(CheckMode mode) {
-        this.mode = mode;
-    }
+	public ModelComparator(CheckMode mode) {
+		this.mode = mode;
+	}
 
-    public List<Difference> compare(IntermediateModel code, IntermediateModel uml) {
-    	
-    	List<Difference> out = new ArrayList<>();
+	public List<Difference> compare(IntermediateModel code, IntermediateModel uml) {
 
-        // ---- classes (presence/name/etc)
-        out.addAll(ClassCheck.compareClasses(code, uml, mode));
+		List<Difference> out = new ArrayList<>();
 
-        // ---- per-class member checks
-        Set<String> common = ClassCheck.commonClassNames(code, uml);
-        for (String cls : common) {
-            ClassInfo cc = ClassCheck.classFrom(code, cls);
-            ClassInfo uc = ClassCheck.classFrom(uml, cls);
+		// ---- classes (presence/name/etc)
+		out.addAll(ClassCheck.compareClasses(code, uml, mode));
 
-            if (mode == CheckMode.MINIMAL) {
-                // MINIMAL (formerly RELAXED_PLUS): omissions allowed; written mismatches are errors
-                out.addAll(AttributeCheckMinimal.compareAttributesInClass(cls, cc, uc, mode));
-                out.addAll(MethodCheckMinimal.compareMethodsInClass(cls, cc, uc, mode));
-            } else {
-                // STRICT and RELAXED use the legacy checkers with their own internal rules
-                out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, mode));
-                out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, mode));
-            }
-        }
+		// ---- per-class member checks
+		Set<String> common = ClassCheck.commonClassNames(code, uml);
+		for (String cls : common) {
+			ClassInfo cc = ClassCheck.classFrom(code, cls);
+			ClassInfo uc = ClassCheck.classFrom(uml, cls);
 
-        // ---- relationships (shared behavior across modes)
-        out.addAll(RelationshipCheck.compareRelationships(code, uml, mode));
+			if (mode == CheckMode.MINIMAL) {
+				// MINIMAL (formerly RELAXED_PLUS): omissions allowed; written mismatches are
+				// errors
+				out.addAll(AttributeCheckMinimal.compareAttributesInClass(cls, cc, uc, mode));
+				out.addAll(MethodCheckMinimal.compareMethodsInClass(cls, cc, uc, mode));
+			} else {
+				// STRICT and RELAXED use the legacy checkers with their own internal rules
+				out.addAll(AttributeCheck.compareAttributesInClass(cls, cc, uc, mode));
+				out.addAll(MethodCheck.compareMethodsInClass(cls, cc, uc, mode));
+			}
+		}
 
-        return out;
-    }
+		// ---- relationships (shared behavior across modes)
+		out.addAll(RelationshipCheck.compareRelationships(code, uml, mode));
+
+		return out;
+	}
 }

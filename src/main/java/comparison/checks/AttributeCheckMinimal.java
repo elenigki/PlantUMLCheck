@@ -121,7 +121,7 @@ public final class AttributeCheckMinimal {
             }
         }
 
-        // --- Code -> UML (omissions are OK; suggest documenting public/protected)
+        // --- Code --> UML (omissions are OK; suggest documenting public/protected)
         for (String name : cm.keySet()) {
             if (um.containsKey(name)) continue; // already handled
             Attribute C = cm.get(name);

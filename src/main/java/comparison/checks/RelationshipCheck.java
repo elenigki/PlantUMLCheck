@@ -85,7 +85,7 @@ public final class RelationshipCheck {
         } else if (!codeGen && umlGen) {
             out.add(new Difference(
                 IssueKind.RELATIONSHIP_MISSING_IN_CODE,
-                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                IssueLevel.ERROR, // UML-only in family -> ERROR in all modes
                 a + " -> " + b,
                 "Inheritance: UML shows GENERALIZATION; code has none",
                 "GENERALIZATION", "missing",
@@ -106,7 +106,7 @@ public final class RelationshipCheck {
         } else if (!codeReal && umlReal) {
             out.add(new Difference(
                 IssueKind.RELATIONSHIP_MISSING_IN_CODE,
-                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                IssueLevel.ERROR, // UML-only in family -> ERROR in all modes
                 a + " -> " + b,
                 "Inheritance: UML shows REALIZATION; code has none",
                 "REALIZATION", "missing",
@@ -126,14 +126,14 @@ public final class RelationshipCheck {
 
         String where = a + " -> " + b;
 
-        // nothing on both sides → done
+        // nothing on both sides -> done
         if (codeOwn == null && umlOwn == null) return;
 
         // only UML has ownership
         if (codeOwn == null && umlOwn != null) {
             out.add(new Difference(
                 IssueKind.RELATIONSHIP_MISMATCH,
-                IssueLevel.ERROR, // UML-only in family => ERROR in all modes
+                IssueLevel.ERROR, // UML-only in family -> ERROR in all modes
                 where,
                 "Ownership: UML shows " + umlOwn.name() + " but code has none",
                 umlOwn.name(), "missing",
@@ -181,7 +181,7 @@ public final class RelationshipCheck {
                 "Downgrade UML ownership to match code"
             ));
         }
-        // equal → OK
+        // equal --> OK
     }
 
     // Handles dependency policy.
@@ -224,7 +224,7 @@ public final class RelationshipCheck {
             return;
         }
 
-        // Code-only dependency (UML omitted) → OK (ignored) in all modes
+        // Code-only dependency (UML omitted) --> OK (ignored) in all modes
         // Intentionally no difference emitted
     }
 

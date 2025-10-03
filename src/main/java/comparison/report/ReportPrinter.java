@@ -136,7 +136,6 @@ public final class ReportPrinter {
                 break;
 
             default:
-                // generic
         }
         return "Expected " + c + "; UML has " + u;
     }
