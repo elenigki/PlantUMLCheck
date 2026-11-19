@@ -21,6 +21,34 @@ The tool supports different levels of strictness in checking, allowing users to 
 - Automatic UML diagram generation from code or corrected model.
 - Web-based interface built with Spring Boot.
 
+## Application Screenshots
+
+The following screenshots illustrate the main workflow of PlantUMLCheck.
+
+### 1. File Upload
+<img width="1153" height="552" alt="PlantUMLCheck File Upload Screen" src="https://github.com/user-attachments/assets/b6bdbb83-1c67-413e-af38-baab69f9b17f" />
+
+Users can upload Java source files and optional PlantUML diagrams. Code-only mode is also available for generating UML diagrams directly from Java source code.
+
+### 2. Class Selection
+<img width="1153" height="562" alt="PlantUMLCheck Class Selection Screen" src="https://github.com/user-attachments/assets/7c286c5e-f5ce-459d-8f27-5cdcf1251fbf" />
+
+Users can select which classes to analyze and choose between three comparison modes: Strict, Relaxed, and Minimal.
+
+### 3. Comparison Results
+
+The application displays the results of the consistency check, including statistics and detected differences.
+
+**Successful Comparison**
+
+<img width="1115" height="417" alt="PlantUMLCheck Successful Comparison" src="https://github.com/user-attachments/assets/4cc3d061-1da1-4d82-bb28-d16fc9d0cb81" />
+
+**Failed Comparison**
+
+<img width="1115" height="541" alt="PlantUMLCheck Detected Inconsistencies" src="https://github.com/user-attachments/assets/c09dbe47-db92-41ac-bec0-d90da3a34cd5" />
+
+Detected inconsistencies are listed with their severity levels. Users can export a report or generate a corrected UML diagram.
+
 ## Project Structure
 - `model/`: Core intermediate model classes.
 - `parser.code/`: Java source code parser.
